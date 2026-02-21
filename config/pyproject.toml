@@ -1,0 +1,12 @@
+[project]
+name = "sbd-drones-economics"
+version = "0.1.0"
+description = "SBD drones economics"
+readme = "README.md"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+# Config lives in config/; project root is parent dir
+pythonpath = [".."]
+testpaths = ["../tests"]
+addopts = "-v"
