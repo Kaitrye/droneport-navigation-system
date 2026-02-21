@@ -1,0 +1,142 @@
+# Docker Compose - MQTT (Mosquitto)
+# ==================================
+# 
+# Запуск:
+#   docker compose -f docker/docker-compose.mqtt.yml up -d --build
+#
+# Остановка:
+#   docker compose -f docker/docker-compose.mqtt.yml down
+
+services:
+  # ============================================
+  # MQTT Broker (Mosquitto)
+  # ============================================
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  # ============================================
+  # Systems
+  # ============================================
+  certification:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: certification
+    environment:
+      - SYSTEM_TYPE=certification
+      - SYSTEM_ID=certification_001
+      - HEALTH_PORT=8000
+      - BROKER_TYPE=mqtt
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    networks:
+      - drones_net
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  insurance:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: insurance
+    environment:
+      - SYSTEM_TYPE=insurance
+      - SYSTEM_ID=insurance_001
+      - HEALTH_PORT=7000
+      - BROKER_TYPE=mqtt
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "7000:7000"
+    networks:
+      - drones_net
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  fleet:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fleet
+    environment:
+      - SYSTEM_TYPE=fleet
+      - SYSTEM_ID=fleet_001
+      - HEALTH_PORT=6000
+      - BROKER_TYPE=mqtt
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "6000:6000"
+    networks:
+      - drones_net
+    depends_on:
+      - mosquitto
+      - insurance
+    restart: unless-stopped
+
+  aggregator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aggregator
+    environment:
+      - SYSTEM_TYPE=aggregator
+      - SYSTEM_ID=aggregator_001
+      - HEALTH_PORT=9000
+      - BROKER_TYPE=mqtt
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "9000:9000"
+    networks:
+      - drones_net
+    depends_on:
+      - mosquitto
+      - fleet
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: orchestrator
+    environment:
+      - SYSTEM_TYPE=orchestrator
+      - SYSTEM_ID=orchestrator_001
+      - HEALTH_PORT=9600
+      - BROKER_TYPE=mqtt
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - DRONE_IMAGE=drones_v2-drone:latest
+      - DOCKER_NETWORK=drones_net
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "9600:9600"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - drones_net
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+networks:
+  drones_net:
+    driver: bridge
+    name: drones_net

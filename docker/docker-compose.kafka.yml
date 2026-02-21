@@ -1,0 +1,198 @@
+# docker compose -f docker/docker-compose.kafka.yml --env-file docker/.env up -d --build
+
+services:
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "${KAFKA_INTERNAL_PORT:-29092}:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:9092,SASL_PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:${KAFKA_PORT:-9092},SASL_PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_PLAINTEXT_INTERNAL:SASL_PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT_INTERNAL
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_OPTS: -Djava.security.auth.login.config=/tmp/jaas.conf
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      CERTIFICATION_USER: ${CERTIFICATION_USER}
+      CERTIFICATION_PASSWORD: ${CERTIFICATION_PASSWORD}
+      INSURANCE_USER: ${INSURANCE_USER}
+      INSURANCE_PASSWORD: ${INSURANCE_PASSWORD}
+      FLEET_USER: ${FLEET_USER}
+      FLEET_PASSWORD: ${FLEET_PASSWORD}
+      AGGREGATOR_USER: ${AGGREGATOR_USER}
+      AGGREGATOR_PASSWORD: ${AGGREGATOR_PASSWORD}
+      ORCHESTRATOR_USER: ${ORCHESTRATOR_USER}
+      ORCHESTRATOR_PASSWORD: ${ORCHESTRATOR_PASSWORD}
+      DRONE_USER: ${DRONE_USER}
+      DRONE_PASSWORD: ${DRONE_PASSWORD}
+    command: >
+      sh -c '
+      echo "KafkaServer {
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username=\"$$ADMIN_USER\"
+        password=\"$$ADMIN_PASSWORD\"
+        user_$${ADMIN_USER}=\"$$ADMIN_PASSWORD\"
+        user_$${CERTIFICATION_USER}=\"$$CERTIFICATION_PASSWORD\"
+        user_$${INSURANCE_USER}=\"$$INSURANCE_PASSWORD\"
+        user_$${FLEET_USER}=\"$$FLEET_PASSWORD\"
+        user_$${AGGREGATOR_USER}=\"$$AGGREGATOR_PASSWORD\"
+        user_$${ORCHESTRATOR_USER}=\"$$ORCHESTRATOR_PASSWORD\"
+        user_$${DRONE_USER}=\"$$DRONE_PASSWORD\";
+      };" > /tmp/jaas.conf &&
+      /etc/kafka/docker/run
+      '
+    networks:
+      - drones_net
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f java || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  certification:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: certification
+    environment:
+      - SYSTEM_TYPE=certification
+      - SYSTEM_ID=certification_001
+      - HEALTH_PORT=8000
+      - BROKER_TYPE=kafka
+      - BROKER_USER=${CERTIFICATION_USER}
+      - BROKER_PASSWORD=${CERTIFICATION_PASSWORD}
+      - KAFKA_SASL_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    networks:
+      - drones_net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  insurance:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: insurance
+    environment:
+      - SYSTEM_TYPE=insurance
+      - SYSTEM_ID=insurance_001
+      - HEALTH_PORT=7000
+      - BROKER_TYPE=kafka
+      - BROKER_USER=${INSURANCE_USER}
+      - BROKER_PASSWORD=${INSURANCE_PASSWORD}
+      - KAFKA_SASL_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "7000:7000"
+    networks:
+      - drones_net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  fleet:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fleet
+    environment:
+      - SYSTEM_TYPE=fleet
+      - SYSTEM_ID=fleet_001
+      - HEALTH_PORT=6000
+      - BROKER_TYPE=kafka
+      - BROKER_USER=${FLEET_USER}
+      - BROKER_PASSWORD=${FLEET_PASSWORD}
+      - KAFKA_SASL_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "6000:6000"
+    networks:
+      - drones_net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      insurance:
+        condition: service_started
+    restart: unless-stopped
+
+  aggregator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aggregator
+    environment:
+      - SYSTEM_TYPE=aggregator
+      - SYSTEM_ID=aggregator_001
+      - HEALTH_PORT=9000
+      - BROKER_TYPE=kafka
+      - BROKER_USER=${AGGREGATOR_USER}
+      - BROKER_PASSWORD=${AGGREGATOR_PASSWORD}
+      - KAFKA_SASL_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "9000:9000"
+    networks:
+      - drones_net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      fleet:
+        condition: service_started
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: orchestrator
+    environment:
+      - SYSTEM_TYPE=orchestrator
+      - SYSTEM_ID=orchestrator_001
+      - HEALTH_PORT=9600
+      - BROKER_TYPE=kafka
+      - BROKER_USER=${ORCHESTRATOR_USER}
+      - BROKER_PASSWORD=${ORCHESTRATOR_PASSWORD}
+      - KAFKA_SASL_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - DRONE_IMAGE=drones_v2-drone:latest
+      - DOCKER_NETWORK=drones_net
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "9600:9600"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - drones_net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  drones_net:
+    driver: bridge
+    name: drones_net

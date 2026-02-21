@@ -1,0 +1,160 @@
+# docker/.env
+
+services:
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    profiles: ["kafka"]
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "${KAFKA_INTERNAL_PORT:-29092}:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: SASL_PLAINTEXT://0.0.0.0:9092,SASL_PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://localhost:${KAFKA_PORT:-9092},SASL_PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_PLAINTEXT_INTERNAL:SASL_PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT_INTERNAL
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_OPTS: -Djava.security.auth.login.config=/tmp/jaas.conf
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      DUMMY_USER_A: ${DUMMY_USER_A}
+      DUMMY_PASSWORD_A: ${DUMMY_PASSWORD_A}
+      DUMMY_USER_B: ${DUMMY_USER_B}
+      DUMMY_PASSWORD_B: ${DUMMY_PASSWORD_B}
+    command: >
+      sh -c '
+      echo "KafkaServer {
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username=\"$$ADMIN_USER\"
+        password=\"$$ADMIN_PASSWORD\"
+        user_$${ADMIN_USER}=\"$$ADMIN_PASSWORD\"
+        user_$${DUMMY_USER_A}=\"$$DUMMY_PASSWORD_A\"
+        user_$${DUMMY_USER_B}=\"$$DUMMY_PASSWORD_B\";
+      };" > /tmp/jaas.conf &&
+      /etc/kafka/docker/run
+      '
+    networks:
+      - drones_net
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f java || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    user: "0:0"
+    profiles: ["mqtt"]
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+    environment:
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      DUMMY_USER_A: ${DUMMY_USER_A}
+      DUMMY_PASSWORD_A: ${DUMMY_PASSWORD_A}
+      DUMMY_USER_B: ${DUMMY_USER_B}
+      DUMMY_PASSWORD_B: ${DUMMY_PASSWORD_B}
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    command: >
+      sh -c '
+      rm -f /mosquitto/data/passwd /mosquitto/data/acl &&
+      mosquitto_passwd -b -c /mosquitto/data/passwd $$ADMIN_USER $$ADMIN_PASSWORD &&
+      mosquitto_passwd -b /mosquitto/data/passwd $$DUMMY_USER_A $$DUMMY_PASSWORD_A &&
+      mosquitto_passwd -b /mosquitto/data/passwd $$DUMMY_USER_B $$DUMMY_PASSWORD_B &&
+      printf "user %s\ntopic readwrite #\n\nuser %s\ntopic readwrite systems/#\ntopic readwrite replies/#\ntopic readwrite drones/#\n\nuser %s\ntopic readwrite systems/#\ntopic readwrite replies/#\ntopic readwrite drones/#\n"
+      "$$ADMIN_USER" "$$DUMMY_USER_A" "$$DUMMY_USER_B"
+      > /mosquitto/data/acl &&
+      chown mosquitto:mosquitto /mosquitto/data/passwd /mosquitto/data/acl &&
+      chmod 700 /mosquitto/data/acl &&
+      exec mosquitto -c /mosquitto/config/mosquitto.conf
+      '
+    networks:
+      - drones_net
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -u $$ADMIN_USER -P $$ADMIN_PASSWORD -t healthcheck -m ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  dummy_system_a:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: dummy_system_a
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+    environment:
+      - SYSTEM_TYPE=dummy
+      - SYSTEM_ID=dummy_system_a
+      - SYSTEM_NAME=DummyA
+      - HEALTH_PORT=${DUMMY_PORT_A:-9700}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${DUMMY_USER_A}
+      - BROKER_PASSWORD=${DUMMY_PASSWORD_A}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${DUMMY_PORT_A:-9700}:${DUMMY_PORT_A:-9700}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  dummy_system_b:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: dummy_system_b
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+    environment:
+      - SYSTEM_TYPE=dummy
+      - SYSTEM_ID=dummy_system_b
+      - SYSTEM_NAME=DummyB
+      - HEALTH_PORT=${DUMMY_PORT_B:-9701}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${DUMMY_USER_B}
+      - BROKER_PASSWORD=${DUMMY_PASSWORD_B}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${DUMMY_PORT_B:-9701}:${DUMMY_PORT_B:-9701}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+networks:
+  drones_net:
+    driver: bridge
+    name: ${DOCKER_NETWORK:-drones_net}
