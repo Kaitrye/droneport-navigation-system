@@ -9,7 +9,6 @@ import sys
 
 from broker.bus_factory import create_system_bus
 from systems.dummy_system.src.dummy import DummySystem
-from systems.nus_system.src.nus_system import NUSSystem
 
 
 def main() -> None:
@@ -27,16 +26,9 @@ def main() -> None:
             bus=bus,
             health_port=health_port or None,
         )
-    elif system_type == "nus":
-        system = NUSSystem(
-            system_id=system_id,
-            name=name,
-            bus=bus,
-            health_port=health_port or None,
-        )
     else:
         print(
-            "Unsupported SYSTEM_TYPE. Use 'dummy' or 'nus'", file=sys.stderr
+            "Unsupported SYSTEM_TYPE. Use 'dummy'", file=sys.stderr
         )
         sys.exit(1)
 

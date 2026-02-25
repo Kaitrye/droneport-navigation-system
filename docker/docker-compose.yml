@@ -154,6 +154,35 @@ services:
       - drones_net
     restart: unless-stopped
 
+  test-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+    environment:
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_HOST=${BROKER_HOST:-kafka}
+      - KAFKA_PORT=${KAFKA_INTERNAL_PORT:-29092}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - COVERAGE_FILE=/tmp/.coverage
+      - PYTHONUNBUFFERED=1
+    command: pytest -c config/pyproject.toml tests/ -v --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+    volumes:
+      - ..:/app
+    networks:
+      - drones_net
+
 networks:
   drones_net:
     driver: bridge

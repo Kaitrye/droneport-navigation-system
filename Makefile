@@ -4,6 +4,7 @@ DOCKER_COMPOSE = docker compose -f docker/docker-compose.yml --env-file docker/.
 LOAD_ENV = set -a && . docker/.env && set +a
 PIPENV_PIPFILE = config/Pipfile
 PYTEST_CONFIG = config/pyproject.toml
+PYTEST_COV_OPTS = --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
 
 help:
 	@echo "make init            - Установить pipenv и зависимости"
@@ -27,35 +28,35 @@ tests:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@$(LOAD_ENV) && export BROKER_TYPE MQTT_PORT KAFKA_PORT && $(MAKE) docker-up
 	@sleep 20
-	@$(LOAD_ENV) && PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/ -v
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) tests/ -v $(PYTEST_COV_OPTS)
 	-$(MAKE) docker-down
 
 e2e-test:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@$(LOAD_ENV) && export BROKER_TYPE MQTT_PORT KAFKA_PORT && $(MAKE) docker-up
 	@sleep 20
-	@$(LOAD_ENV) && PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/e2e/ -v
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) tests/e2e/ -v $(PYTEST_COV_OPTS)
 	-$(MAKE) docker-down
 
 unit-test:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@$(LOAD_ENV) && export BROKER_TYPE MQTT_PORT KAFKA_PORT && $(MAKE) docker-up
 	@sleep 20
-	@$(LOAD_ENV) && PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/unit/ -v
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) tests/unit/ -v $(PYTEST_COV_OPTS)
 	-$(MAKE) docker-down
 
 integration-test:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@$(LOAD_ENV) && export BROKER_TYPE MQTT_PORT KAFKA_PORT && $(MAKE) docker-up
 	@sleep 20
-	@$(LOAD_ENV) && PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/integration/ -v
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) tests/integration/ -v $(PYTEST_COV_OPTS)
 	-$(MAKE) docker-down
 
 dummy-component-integration-test:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@$(LOAD_ENV) && export BROKER_TYPE MQTT_PORT KAFKA_PORT && $(MAKE) docker-up
 	@sleep 20
-	@$(LOAD_ENV) && PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) components/dummy_component/tests/integration/ -v
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) components/dummy_component/tests/integration/ -v $(PYTEST_COV_OPTS)
 	-$(MAKE) docker-down
 
 docker-build:

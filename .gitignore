@@ -7,3 +7,7 @@ __pychache__
 *.vscode
 *.pytest_cache
 *.pyc
+
+.coverage
+coverage.xml
+htmlcov/
