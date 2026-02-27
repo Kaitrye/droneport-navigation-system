@@ -1,12 +1,18 @@
 """
 DroneportSystem — система управления дронопортом для агродронов.
-Реализует базовые функции:
-- Регистрация/удаление дронов в парке
-- Генерация списка дронов с целями безопасности
-- Диагностика перед вылетом и после возврата (уровень заряда, неисправности)
-- Оптимизация зарядки с учётом времени вылета и мощности подключения
 
-Это учебный скелет: бизнес-логика минимальна и может расширяться в рамках лабораторных работ.
+Реализует интеграционный контракт с RobotSystem (НУС) согласно DronePort.md:
+- Подготовка БВС к миссии (резервирование, preflight, зарядка)
+- Поддержка запуска/посадки в штатном и аварийном режимах
+- Передача статусов инфраструктуры
+
+Архитектура:
+- Система оркестрирует работу компонентов:
+  - PortManager — управление слотами
+  - BatteryCharger — зарядка до порога
+  - DroneRegistry — учёт состояния дронов
+  - StateStore — хранение в Redis
+- Все входящие команды обрабатываются через SystemBus
 """
 
 from typing import Dict, Any, Optional, List
@@ -14,14 +20,26 @@ from shared.base_system import BaseSystem
 from shared.topics import SystemTopics, DroneportActions
 from broker.system_bus import SystemBus
 import logging
+import time
 
-# Настройка логгера
+# Импорты компонентов (должны быть реализованы в components/)
+try:
+    from components.state_store.src.state_store import StateStore
+    from components.port_manager.src.port_manager import PortManager
+    from components.battery_charger.src.battery_charger import BatteryCharger
+    from components.drone_registry.src.drone_registry import DroneRegistry
+except ImportError as e:
+    logging.warning(f"Component import failed (running in dev mode?): {e}")
+    # Для учебного запуска можно временно заменить на mock-реализации
+    StateStore = PortManager = BatteryCharger = DroneRegistry = None
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class DroneportSystem(BaseSystem):
-    """Реализация Дронопорта как SystemBus-сервиса."""
+    """Система Дронопорта как сервис на SystemBus."""
 
     def __init__(
         self,
@@ -29,6 +47,8 @@ class DroneportSystem(BaseSystem):
         name: str,
         bus: SystemBus,
         health_port: Optional[int] = None,
+        redis_host: str = "localhost",
+        redis_port: int = 6379,
     ):
         super().__init__(
             system_id=system_id,
@@ -40,241 +60,230 @@ class DroneportSystem(BaseSystem):
         self.name = name
         logger.info(f"DroneportSystem '{name}' initialized")
 
-        # Простейшее in-memory хранилище дронов и портов
-        self._drones: Dict[str, Dict[str, Any]] = {}  # drone_id → {status, battery, last_check, ...}
-        self._ports: Dict[str, Dict[str, Any]] = {}   # port_id → {drone_id, charging_power_w, status}
+        # Инициализация компонентов
+        if StateStore is not None:
+            self.state_store = StateStore(host=redis_host, port=redis_port)
+            self.port_manager = PortManager(self.state_store)
+            self.battery_charger = BatteryCharger(self.state_store)
+            self.drone_registry = DroneRegistry(self.state_store)
+        else:
+            # fallback для демонстрации без компонентов
+            logger.warning("Running in fallback mode (in-memory storage)")
+            self._drones: Dict[str, Dict[str, Any]] = {}
+            self._ports: Dict[str, Dict[str, Any]] = {}
 
-    # ======================== Регистрация обработчиков ========================
     def _register_handlers(self) -> None:
-        """Регистрация обработчиков для действий Дронопорта."""
-        self.register_handler(DroneportActions.REQUEST_LANDING, self._handle_request_landing)
-        self.register_handler(DroneportActions.REQUEST_TAKEOFF, self._handle_request_takeoff)
-        self.register_handler(DroneportActions.START_CHARGING, self._handle_start_charging)
-        self.register_handler(DroneportActions.STOP_CHARGING, self._handle_stop_charging)
-        self.register_handler(DroneportActions.GET_PORT_STATUS, self._handle_get_port_status)
+        """Регистрация обработчиков команд от НУС."""
+        self.register_handler(DroneportActions.RESERVE_SLOTS, self._handle_reserve_slots)
+        self.register_handler(DroneportActions.PREFLIGHT_CHECK, self._handle_preflight_check)
+        self.register_handler(DroneportActions.CHARGE_TO_THRESHOLD, self._handle_charge_to_threshold)
+        self.register_handler(DroneportActions.RELEASE_FOR_TAKEOFF, self._handle_release_for_takeoff)
+        self.register_handler(DroneportActions.REQUEST_LANDING_SLOT, self._handle_request_landing_slot)
+        self.register_handler(DroneportActions.DOCK, self._handle_dock)
+        self.register_handler(DroneportActions.EMERGENCY_RECEIVE, self._handle_emergency_receive)
+        self.register_handler(DroneportActions.HEALTH_CHECK, self._handle_health_check)
 
-    # ======================== Обработчики действий ===========================
-
-    def _handle_request_landing(
-        self, message: Dict[str, Any]
+    def _create_response(
+        self,
+        original_message: Dict[str, Any],
+        status: str,
+        payload: Optional[Dict[str, Any]] = None,
+        error_code: Optional[str] = None,
+        reason: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        ОФ1. Проверка запроса и добавление нового дрона в парк.
-        Payload: {"drone_id": str, "port_id": str, "battery_level": float (0..100)}
-        Returns: {"drone_id": str, "port_id": str, "status": "landed", "message": str}
-        """
-        payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
-        port_id = payload.get("port_id")
-        battery = payload.get("battery_level", 50.0)
-
-        if not drone_id:
-            return {"error": "drone_id_required", "status": "rejected"}
-        if not port_id:
-            return {"error": "port_id_required", "status": "rejected"}
-
-        # Проверка: порт свободен?
-        if port_id in self._ports and self._ports[port_id].get("drone_id"):
-            return {
-                "drone_id": drone_id,
-                "port_id": port_id,
-                "status": "rejected",
-                "message": f"Port {port_id} is occupied",
-            }
-
-        # Добавляем дрона в парк
-        self._drones[drone_id] = {
-            "drone_id": drone_id,
-            "port_id": port_id,
-            "battery_level": float(battery),
-            "status": "landed",
-            "last_landing_time": self._get_timestamp(),
-            "issues": [],
+        """Унифицированный формат ответа по контракту DronePort.md."""
+        response = {
+            "message_id": original_message.get("message_id", f"resp_{int(time.time())}"),
+            "timestamp": self._get_iso_timestamp(),
+            "status": status,
         }
+        if payload:
+            response["payload"] = payload
+        if error_code:
+            response["error_code"] = error_code
+            response["reason"] = reason or ""
+            response["retryable"] = error_code not in ("INTERNAL_ERROR", "PORT_UNAVAILABLE")
+        return response
 
-        # Занимаем порт
-        self._ports[port_id] = {
-            "drone_id": drone_id,
-            "charging_power_w": 0.0,
-            "status": "occupied",
-            "last_update": self._get_timestamp(),
-        }
+    def _get_iso_timestamp(self) -> str:
+        """Возвращает текущее время в ISO 8601."""
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        logger.info(f"Drone {drone_id} landed at port {port_id}, battery={battery}%")
-        return {
-            "drone_id": drone_id,
-            "port_id": port_id,
-            "status": "landed",
-            "message": "Landing accepted",
-        }
+    # ==================== Обработчики команд ====================
 
-    def _handle_request_takeoff(
-        self, message: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        ОФ2. Удаление дрона из парка (после разрешения вылета).
-        Payload: {"drone_id": str}
-        Returns: {"drone_id": str, "status": "takeoff_approved", "battery_level": float}
-        """
-        payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
+    def _handle_reserve_slots(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды reserve_slots."""
+        try:
+            payload = message.get("payload", {})
+            drone_ids: List[str] = payload.get("drone_ids", [])
+            mission_window = payload.get("mission_window", {})
 
-        if not drone_id or drone_id not in self._drones:
-            return {"drone_id": drone_id, "status": "not_found"}
+            if not drone_ids:
+                return self._create_response(
+                    message, "rejected", error_code="INVALID_REQUEST", reason="drone_ids required"
+                )
 
-        drone = self._drones[drone_id]
-        port_id = drone["port_id"]
+            # Проверка доступности слотов
+            available = all(self.port_manager.is_port_available(did) for did in drone_ids)
+            if not available:
+                return self._create_response(
+                    message, "rejected", error_code="PORT_RESOURCE_BUSY", reason="No available slots"
+                )
 
-        # Освобождаем порт
-        if port_id in self._ports:
-            del self._ports[port_id]
+            # Резервирование
+            for drone_id in drone_ids:
+                self.port_manager.reserve_port(drone_id, mission_window)
 
-        # Удаляем дрона из парка
-        del self._drones[drone_id]
+            return self._create_response(message, "reserved", payload={"slots": drone_ids})
+        except Exception as e:
+            logger.error(f"Error in reserve_slots: {e}")
+            return self._create_response(
+                message, "rejected", error_code="INTERNAL_ERROR", reason=str(e)
+            )
 
-        logger.info(f"Drone {drone_id} took off from port {port_id}")
-        return {
-            "drone_id": drone_id,
-            "status": "takeoff_approved",
-            "battery_level": drone["battery_level"],
-        }
+    def _handle_preflight_check(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды preflight_check."""
+        try:
+            payload = message.get("payload", {})
+            drone_id = payload.get("drone_id")
+            if not drone_id:
+                return self._create_response(
+                    message, "preflight.failed", error_code="INVALID_REQUEST", reason="drone_id required"
+                )
 
-    def _handle_start_charging(
-        self, message: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        ПРФ1. Оптимизация зарядки: учитываем время вылета и мощность подключения.
-        Payload: {"drone_id": str, "target_battery": float (0..100), "departure_time_sec": int}
-        Returns: {"drone_id": str, "charging_power_w": float, "estimated_finish_sec": int}
-        """
-        payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
-        target_bat = payload.get("target_battery", 90.0)
-        dep_time = payload.get("departure_time_sec", 3600)  # default: 1 hour
+            # Простая проверка: дрон должен быть зарегистрирован и иметь батарею > 20%
+            drone = self.drone_registry.get_drone(drone_id)
+            if not drone or float(drone.get("battery_level", 0)) < 20.0:
+                return self._create_response(
+                    message, "preflight.failed", error_code="PORT_PRECHECK_FAILED", reason="Low battery"
+                )
 
-        if not drone_id or drone_id not’t in self._drones:
-            return {"error": "drone_not_found", "status": "rejected"}
+            return self._create_response(message, "preflight.ok")
+        except Exception as e:
+            logger.error(f"Error in preflight_check: {e}")
+            return self._create_response(
+                message, "preflight.failed", error_code="INTERNAL_ERROR", reason=str(e)
+            )
 
-        drone = self._drones[drone_id]
-        current_bat = drone["battery_level"]
-        if current_bat >= target_bat:
-            return {
-                "drone_id": drone_id,
-                "status": "already_sufficient",
-                "battery_level": current_bat,
-            }
+    def _handle_charge_to_threshold(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды charge_to_threshold."""
+        try:
+            payload = message.get("payload", {})
+            drone_id = payload.get("drone_id")
+            min_battery = float(payload.get("min_battery", 80.0))
 
-        # Простая модель: мощность заряда = (цель - текущий) * 10 Вт / %, но ≤ 1000 Вт
-        delta_bat = target_bat - current_bat
-        required_energy_wh = delta_bat * 0.01 * 10  # условная ёмкость батареи = 10 Wh
-        # Максимальная мощность порта — 500 Вт (можно сделать конфигурируемой позже)
-        max_power_w = 500.0
-        charging_power_w = min(max_power_w, required_energy_wh * 3600 / dep_time)  # Wh → W = Wh / h
+            if not drone_id:
+                return self._create_response(
+                    message, "failed", error_code="INVALID_REQUEST", reason="drone_id required"
+                )
 
-        estimated_finish_sec = int(required_energy_wh * 3600 / charging_power_w) if charging_power_w > 0 else 0
+            result = self.battery_charger.charge_to_threshold(drone_id, min_battery)
+            if result["success"]:
+                return self._create_response(message, "charge.completed")
+            else:
+                return self._create_response(
+                    message, "charge.timeout", error_code="PORT_CHARGE_TIMEOUT", reason=result.get("reason", "")
+                )
+        except Exception as e:
+            logger.error(f"Error in charge_to_threshold: {e}")
+            return self._create_response(
+                message, "failed", error_code="INTERNAL_ERROR", reason=str(e)
+            )
 
-        # Обновляем порт
-        port_id = drone["port_id"]
-        if port_id in self._ports:
-            self._ports[port_id]["charging_power_w"] = charging_power_w
-            self._ports[port_id]["status"] = "charging"
+    def _handle_release_for_takeoff(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды release_for_takeoff."""
+        return self._create_response(message, "release_ack")
 
-        # Обновляем дрона
-        drone["charging_power_w"] = charging_power_w
-        drone["target_battery"] = target_bat
-        drone["estimated_finish_sec"] = estimated_finish_sec
+    def _handle_request_landing_slot(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды request_landing_slot."""
+        try:
+            payload = message.get("payload", {})
+            drone_id = payload.get("drone_id")
+            if not drone_id:
+                return self._create_response(
+                    message, "denied", error_code="INVALID_REQUEST", reason="drone_id required"
+                )
 
-        logger.info(
-            f"Charging started for drone {drone_id}: "
-            f"{charging_power_w:.0f}W → {target_bat}% in {estimated_finish_sec}s"
-        )
-        return {
-            "drone_id": drone_id,
-            "charging_power_w": charging_power_w,
-            "estimated_finish_sec": estimated_finish_sec,
-            "status": "charging_started",
-        }
+            if self.port_manager.is_port_available(drone_id):
+                self.port_manager.assign_landing_slot(drone_id)
+                return self._create_response(message, "slot_assigned")
+            else:
+                return self._create_response(
+                    message, "denied", error_code="PORT_RESOURCE_BUSY", reason="No slot available"
+                )
+        except Exception as e:
+            logger.error(f"Error in request_landing_slot: {e}")
+            return self._create_response(
+                message, "denied", error_code="INTERNAL_ERROR", reason=str(e)
+            )
 
-    def _handle_stop_charging(
-        self, message: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Остановка зарядки."""
-        payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
+    def _handle_dock(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка команды dock + запуск пост-обработки."""
+        try:
+            payload = message.get("payload", {})
+            drone_id = payload.get("drone_id")
+            if not drone_id:
+                return self._create_response(
+                    message, "failed", error_code="INVALID_REQUEST", reason="drone_id required"
+                )
 
-        if not drone_id or drone_id not in self._drones:
-            return {"error": "drone_not_found", "status": "rejected"}
+            # Регистрация посадки
+            self.drone_registry.register_landing(drone_id)
 
-        port_id = self._drones[drone_id]["port_id"]
-        if port_id in self._ports:
-            self._ports[port_id]["charging_power_w"] = 0.0
-            self._ports[port_id]["status"] = "idle"
+            # Запуск диагностики и зарядки (внутренняя логика)
+            diagnostics_ok = self._run_post_landing_diagnostics(drone_id)
+            charging_started = self._auto_start_charging_if_needed(drone_id)
 
-        logger.info(f"Charging stopped for drone {drone_id}")
-        return {"drone_id": drone_id, "status": "charging_stopped"}
+            status = "docked"
+            return self._create_response(message, status)
+        except Exception as e:
+            logger.error(f"Error in dock: {e}")
+            return self._create_response(
+                message, "failed", error_code="PORT_DOCK_FAILED", reason=str(e)
+            )
 
-    def _handle_get_port_status(
-        self, message: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        ОФ3. Генерация списка всех дронов, их целей безопасности и состояния.
-        Payload: {"filter": "all"|"landed"|"charging"} (опционально)
-        Returns: {"drones": List[Dict], "total": int}
-        """
-        payload = message.get("payload", {})
-        filter_by = payload.get("filter", "all")
+    def _handle_emergency_receive(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Обработка аварийного приёма."""
+        return self._create_response(message, "emergency_ack")
 
-        drones_list: List[Dict[str, Any]] = []
-        for drone in self._drones.values():
-            # ОФ4: диагностика — добавляем поля safety_target и issues
-            safety_target: str = "normal_operation"
-            if drone["battery_level"] < 20:
-                safety_target = "low_battery_alert"
-                drone["issues"].append("battery_critical")
-            if drone.get("charging_power_w", 0) == 0 and drone["status"] == "landed":
-                safety_target = "waiting_for_charge"
+    def _handle_health_check(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Проверка доступности сервиса."""
+        try:
+            # Простая проверка: попытка подключиться к Redis
+            if hasattr(self, 'state_store') and self.state_store.redis.ping():
+                return self._create_response(message, "health.ok")
+            else:
+                return self._create_response(message, "health.degraded", error_code="PORT_UNAVAILABLE")
+        except Exception:
+            return self._create_response(message, "health.degraded", error_code="PORT_UNAVAILABLE")
 
-            drones_list.append({
-                "drone_id": drone["drone_id"],
-                "port_id": drone["port_id"],
-                "battery_level": drone["battery_level"],
-                "status": drone["status"],
-                "safety_target": safety_target,
-                "issues": drone.get("issues", []),
-                "last_landing_time": drone.get("last_landing_time"),
-                "charging_power_w": drone.get("charging_power_w", 0.0),
-            })
+    # ==================== Внутренняя логика ====================
 
-        if filter_by == "landed":
-            drones_list = [d for d in drones_list if d["status"] == "landed"]
-        elif filter_by == "charging":
-            drones_list = [d for d in drones_list if d["charging_power_w"] > 0]
+    def _run_post_landing_diagnostics(self, drone_id: str) -> bool:
+        """Выполняет диагностику после посадки (имитация)."""
+        logger.info(f"Running post-landing diagnostics for {drone_id}")
+        # TODO: реальная диагностика (чтение сенсоров и т.п.)
+        return True
 
-        return {
-            "drones": drones_list,
-            "total": len(drones_list),
-            "timestamp": self._get_timestamp(),
-        }
-
-    # ======================== Вспомогательные методы =========================
-
-    def _get_timestamp(self) -> float:
-        """Возвращает Unix timestamp (в секундах). Для учебного прототипа — просто time.time()."""
-        import time
-        return time.time()
-
-    # ======================== Расширенный статус системы ======================
+    def _auto_start_charging_if_needed(self, drone_id: str) -> bool:
+        """Автоматически запускает зарядку, если уровень батареи < 80%."""
+        drone = self.drone_registry.get_drone(drone_id)
+        if drone and float(drone.get("battery_level", 0)) < 80.0:
+            self.battery_charger.charge_to_threshold(drone_id, 90.0)
+            logger.info(f"Auto-started charging for {drone_id}")
+            return True
+        return False
 
     def get_status(self) -> Dict[str, Any]:
-        """Расширенный статус системы (для healthcheck и мониторинга)."""
+        """Расширенный статус системы для healthcheck."""
         status = super().get_status()
-        status.update(
-            {
-                "name": self.name,
-                "drones_total": len(self._drones),
-                "ports_total": len(self._ports),
-                "ports_occupied": sum(1 for p in self._ports.values() if p.get("drone_id")),
-                "charging_active": sum(1 for p in self._ports.values() if p.get("charging_power_w", 0) > 0),
-            }
-        )
+        status.update({
+            "name": self.name,
+            "component_mode": StateStore is not None,
+        })
+        if hasattr(self, 'state_store'):
+            try:
+                status["redis_connected"] = self.state_store.redis.ping()
+            except Exception:
+                status["redis_connected"] = False
         return status

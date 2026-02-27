@@ -79,15 +79,12 @@ class NUSActions:
 
 
 class DroneportActions:
-    """Действия для Дронопорта.
-
-    Пока используются как заготовка для будущей реализации
-    управления посадочными местами и зарядкой.
-    """
-
-    REQUEST_LANDING = "request_landing"
-    REQUEST_TAKEOFF = "request_takeoff"
-    START_CHARGING = "start_charging"
-    STOP_CHARGING = "stop_charging"
-    GET_PORT_STATUS = "get_port_status"
+    RESERVE_SLOTS = "reserve_slots"
+    PREFLIGHT_CHECK = "preflight_check"
+    CHARGE_TO_THRESHOLD = "charge_to_threshold"
+    RELEASE_FOR_TAKEOFF = "release_for_takeoff"
+    REQUEST_LANDING_SLOT = "request_landing_slot"
+    DOCK = "dock"
+    EMERGENCY_RECEIVE = "emergency_receive"
+    HEALTH_CHECK = "health.check"
     RESPONSE = "response"
