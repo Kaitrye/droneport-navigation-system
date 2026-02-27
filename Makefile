@@ -86,3 +86,6 @@ docker-clean:
 	-$(DOCKER_COMPOSE) --profile mqtt down -v --rmi local 2>/dev/null
 	-docker ps -aq --filter "label=type=drone" | xargs -r docker rm -f
 	-docker images -q "drones_v2*" | xargs -r docker rmi -f
+
+run-tests-only:
+	@$(LOAD_ENV) && $(DOCKER_COMPOSE) run --rm test-runner pytest -c $(PYTEST_CONFIG) tests/ -v $(PYTEST_COV_OPTS)
