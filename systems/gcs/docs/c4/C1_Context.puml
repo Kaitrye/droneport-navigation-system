@@ -1,0 +1,15 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+LAYOUT_LEFT_RIGHT()
+
+Person(operator, "Эксплуатант", "Ставит задачу верхнего уровня, отменяет и мониторит выполнение")
+System(gcs, "НУС (Ground Control Station)", "Автоматически формирует группы БВС и управляет выполнением миссий")
+System_Ext(drone_port, "Дронопорт", "Хранение, зарядка и подготовка БВС")
+System_Ext(drones, "Дроны (БВС)", "Выполняют миссии, принимают команды, отправляют телеметрию")
+
+Rel(operator, gcs, "Постановка задачи, отмена и мониторинг", "UI/API")
+Rel(gcs, drone_port, "Подготовка БВС к миссии", "Commands/Status")
+Rel(gcs, drones, "Управляющие команды", "Mission Commands")
+Rel(drones, gcs, "Телеметрия и статусы", "Telemetry Events")
+
+@enduml

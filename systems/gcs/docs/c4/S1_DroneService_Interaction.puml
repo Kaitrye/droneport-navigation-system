@@ -1,0 +1,74 @@
+@startuml
+' Integration sequence for command alignment with external drone service
+
+title НУС ↔ Внешний сервис дронов: схема взаимодействия команд
+
+autonumber
+
+actor "Эксплуатант" as Operator
+participant "API Layer" as API
+participant "MissionSystem" as Mission
+participant "OrchestratorSystem" as Orc
+participant "RobotSystem\n(Command Handler)" as Robot
+participant "Внешний сервис дронов" as DroneSvc
+participant "Дрон (БВС)" as Drone
+participant "TelemetrySystem" as Telemetry
+participant "Redis" as Redis
+
+== Постановка задачи ==
+Operator -> API: task.submit
+API -> Mission: task.submit
+Mission -> Orc: orchestrator.plan (query)
+Orc -> Robot: robot.upload_mission (command)
+
+== Подготовка миссии ==
+Robot -> DroneSvc: upload_mission(mission_id, route)
+DroneSvc --> Robot: accepted | rejected + reason
+
+alt accepted
+  Robot -> DroneSvc: arm(drone_id)
+  DroneSvc --> Robot: armed | failed
+  Robot -> DroneSvc: takeoff(drone_id)
+  DroneSvc --> Robot: in_air | failed
+  Robot -> Orc: robot.state.changed(in_air)
+else rejected/failed
+  Robot -> Orc: robot.error(code, reason)
+end
+
+== Выполнение и мониторинг ==
+loop каждые 200-1000 мс
+  DroneSvc -> Robot: telemetry.update(position, battery, status)
+  Robot -> Telemetry: telemetry.update
+  Telemetry -> Redis: state.fleet.updated
+end
+
+== Завершение ==
+Orc -> Robot: robot.return_to_base | robot.land
+Robot -> DroneSvc: return_to_base() | land()
+DroneSvc --> Robot: completed
+Robot -> Orc: robot.state.changed(completed)
+
+== Аварийная отмена ==
+Operator -> API: task.cancel
+API -> Mission: mission.cancel
+Mission -> Orc: orchestrator.execute(cancel)
+Orc -> Robot: robot.abort
+Robot -> DroneSvc: abort(mission_id)
+DroneSvc --> Robot: abort_ack
+Robot -> Orc: robot.state.changed(aborted)
+
+== Health/доступность интеграции ==
+loop периодически
+  Robot -> DroneSvc: health.check
+  DroneSvc --> Robot: health.ok | health.degraded
+end
+
+note right of DroneSvc
+  Для согласования контракта команд:
+  - upload_mission: request/response
+  - arm/takeoff/land/return_to_base/abort: request/response
+  - telemetry.update: async event stream
+  - health.check: request/response
+end note
+
+@enduml

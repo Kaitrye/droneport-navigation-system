@@ -16,8 +16,14 @@ class SystemTopics:
     # Существующая учебная система
     DUMMY = "systems.dummy"
 
-    # Наземная управляющая станция (НУС / GCS)
-    NUS = "systems.nus"
+    # Наземная управляющая станция (GCS)
+    GCS = "systems.gcs"
+    GCS_MISSION = "systems.gcs.mission"
+    GCS_ORCHESTRATOR = "systems.gcs.orchestrator"
+    GCS_FLEET = "systems.gcs.fleet"
+    GCS_ROBOT = "systems.gcs.robot"
+    GCS_TELEMETRY = "systems.gcs.telemetry"
+    GCS_REDIS = "systems.gcs.redis"
 
     # Дронопорт (инфраструктура посадки/зарядки)
     DRONEPORT = "systems.droneport"
@@ -27,7 +33,13 @@ class SystemTopics:
         """Возвращает список всех системных топиков."""
         return [
             cls.DUMMY,
-            cls.NUS,
+            cls.GCS,
+            cls.GCS_MISSION,
+            cls.GCS_ORCHESTRATOR,
+            cls.GCS_FLEET,
+            cls.GCS_ROBOT,
+            cls.GCS_TELEMETRY,
+            cls.GCS_REDIS,
             cls.DRONEPORT,
         ]
 
@@ -48,8 +60,8 @@ class DummyActions:
 # ============================================================================
 
 
-class NUSActions:
-    """Действия для НУС.
+class GCSActions:
+    """Действия для GCS.
 
     Эти действия используются во внешнем API НУС и при
     межсистемном взаимодействии через SystemBus.
@@ -71,6 +83,13 @@ class NUSActions:
 
     # Унифицированный ответ
     RESPONSE = "response"
+
+    # Task-driven модель (согласно C4)
+    TASK_SUBMIT = "task.submit"
+    MISSION_CANCEL_V2 = "mission.cancel"
+    TELEMETRY_UPDATE = "telemetry.update"
+    MISSION_GET = "mission.get"
+    FLEET_GET_STATUS = "fleet.get_status"
 
 
 # ============================================================================

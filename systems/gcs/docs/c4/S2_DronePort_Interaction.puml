@@ -1,0 +1,87 @@
+@startuml
+' Integration sequence for command alignment with external drone port service
+
+title НУС ↔ Дронопорт: схема взаимодействия команд
+
+autonumber
+
+actor "Эксплуатант" as Operator
+participant "API Layer" as API
+participant "MissionSystem" as Mission
+participant "OrchestratorSystem" as Orc
+participant "FleetSystem" as Fleet
+participant "RobotSystem" as Robot
+participant "Дронопорт" as Port
+participant "TelemetrySystem" as Telemetry
+participant "Redis" as Redis
+
+== Инициация задачи ==
+Operator -> API: task.submit
+API -> Mission: task.submit
+Mission -> Orc: orchestrator.plan (query)
+Orc -> Fleet: fleet.allocate (query)
+Fleet --> Orc: fleet.allocated
+
+== Подготовка БВС в Дронопорту ==
+Orc -> Robot: robot.prepare_assets(mission_id, drone_ids)
+Robot -> Port: reserve_slots(drone_ids, mission_window)
+Port --> Robot: reserved | rejected
+
+alt reserved
+  Robot -> Port: preflight_check(drone_ids)
+  Port --> Robot: preflight.ok | preflight.failed
+  Robot -> Port: charge_to_threshold(drone_ids, min_battery)
+  Port --> Robot: charge.completed | charge.timeout
+  Robot -> Port: release_for_takeoff(drone_ids)
+  Port --> Robot: release_ack
+  Robot -> Orc: robot.state.changed(assets_ready)
+else rejected / failed
+  Robot -> Orc: robot.error(code, reason)
+end
+
+== Выполнение ==
+Orc -> Robot: robot.upload_mission / robot.takeoff
+Robot -> Port: gate_open / takeoff_corridor_ready
+Port --> Robot: ready_ack
+Robot -> Telemetry: telemetry.update
+Telemetry -> Redis: state.fleet.updated
+
+== Возврат и пост-обработка ==
+Orc -> Robot: robot.return_to_base | robot.land
+Robot -> Port: request_landing_slot(drone_id)
+Port --> Robot: slot_assigned | denied
+Robot -> Port: dock(drone_id)
+Port --> Robot: docked
+Port -> Port: run_post_landing_diagnostics(drone_id)
+Port --> Robot: diagnostics.ok | diagnostics.failed
+Port -> Port: auto_start_charging_if_needed(drone_id)
+Port --> Robot: charging.started | charging.not_required
+Robot -> Orc: robot.state.changed(recovered)
+
+== Аварийный сценарий ==
+Operator -> API: task.cancel
+API -> Mission: mission.cancel
+Mission -> Orc: orchestrator.execute(cancel)
+Orc -> Robot: robot.abort
+Robot -> Port: emergency_receive(drone_id)
+Port --> Robot: emergency_ack
+Robot -> Orc: robot.state.changed(aborted)
+
+== Health/доступность интеграции ==
+loop периодически
+  Robot -> Port: health.check
+  Port --> Robot: health.ok | health.degraded
+end
+
+note right of Port
+  Для согласования контракта:
+  - reserve_slots/preflight_check/charge_to_threshold:
+    request/response
+  - release_for_takeoff/request_landing_slot/dock:
+    request/response
+  - диагностика и зарядка после dock:
+    внутренняя логика Дронопорта + статусные события
+  - health.check: request/response
+end note
+
+@enduml

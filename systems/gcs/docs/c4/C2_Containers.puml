@@ -1,0 +1,43 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+LAYOUT_LEFT_RIGHT()
+
+Person(operator, "Эксплуатант")
+System_Ext(drone_port, "Дронопорт")
+System_Ext(drones, "Дроны (БВС)")
+
+System_Boundary(gcs, "НУС") {
+  Container(api, "API Layer", "HTTP/gRPC", "Внешний интерфейс НУС")
+  Container(bus, "SystemBus", "MQTT/Kafka/In-Memory", "Маршрутизация по topic/action")
+
+  Container(mission, "MissionSystem", "Python service", "Создание, запуск, отмена миссий")
+  Container(orchestrator, "OrchestratorSystem", "Python service", "Координация выполнения миссии")
+  Container(fleet, "FleetSystem", "Python service", "Подбор и резервирование БВС")
+  Container(robot, "RobotSystem", "Python service", "Команды БВС и интеграция с Дронопортом")
+  Container(telemetry, "TelemetrySystem", "Python service", "Обработка потока телеметрии")
+
+  ContainerDb(redis, "Redis", "State Store", "Состояние миссий, флота, телеметрии")
+}
+
+Rel(operator, api, "Постановка задачи, отмена, мониторинг")
+Rel(api, mission, "task.submit/cancel")
+
+Rel(mission, bus, "publish/request")
+Rel(orchestrator, bus, "publish/request")
+Rel(fleet, bus, "publish/request")
+Rel(robot, bus, "publish/request")
+Rel(telemetry, bus, "publish/subscribe")
+
+Rel(mission, redis, "Сохраняет миссии")
+Rel(mission, orchestrator, "Автозапуск: orchestrator.plan/execute")
+Rel(orchestrator, fleet, "fleet.allocate/release")
+Rel(orchestrator, robot, "robot.*")
+
+Rel(robot, drones, "Команды управления")
+Rel(drones, robot, "Телеметрия")
+Rel(robot, telemetry, "telemetry.update")
+Rel(telemetry, redis, "Обновляет состояние")
+Rel(api, redis, "Чтение состояния для мониторинга")
+Rel(robot, drone_port, "Подготовка и статусы")
+
+@enduml

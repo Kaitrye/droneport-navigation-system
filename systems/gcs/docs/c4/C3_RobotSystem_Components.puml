@@ -1,0 +1,36 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+LAYOUT_LEFT_RIGHT()
+
+Container_Boundary(robot_sys, "RobotSystem") {
+  Component(cmd_handler, "Command Handler", "Application", "Принимает robot.* команды из SystemBus")
+  Component(mission_uploader, "Mission Uploader", "Domain Service", "Подготавливает и отправляет миссию на БВС")
+  Component(flight_control, "Flight Control", "Domain Service", "Arm/Takeoff/Land/RTB/Abort")
+  Component(telemetry_adapter, "Telemetry Adapter", "Adapter", "Принимает телеметрию от БВС")
+  Component(drone_port_adapter, "DronePort Adapter", "Adapter", "Интеграция с Дронопортом")
+  Component(event_publisher, "Event Publisher", "Infrastructure", "Публикует robot.* и telemetry.update события")
+  Component(state_reporter, "State Reporter", "Infrastructure", "Формирует статусные события и ошибки")
+}
+
+Container_Ext(bus, "SystemBus", "Message Bus")
+System_Ext(drones, "Дроны (БВС)")
+System_Ext(drone_port, "Дронопорт")
+Container_Ext(telemetry_sys, "TelemetrySystem", "Python service")
+
+Rel(bus, cmd_handler, "robot.upload_mission/arm/takeoff/land/return_to_base/abort")
+Rel(cmd_handler, mission_uploader, "upload mission")
+Rel(cmd_handler, flight_control, "execute control command")
+Rel(mission_uploader, drones, "upload mission")
+Rel(flight_control, drones, "flight commands")
+
+Rel(drones, telemetry_adapter, "telemetry stream")
+Rel(telemetry_adapter, event_publisher, "normalized telemetry.update")
+Rel(event_publisher, bus, "publish events")
+Rel(event_publisher, telemetry_sys, "telemetry.update")
+
+Rel(cmd_handler, drone_port_adapter, "prepare/check resources")
+Rel(drone_port_adapter, drone_port, "prepare/status")
+Rel(flight_control, state_reporter, "execution result")
+Rel(state_reporter, bus, "robot.state.changed / robot.error")
+
+@enduml

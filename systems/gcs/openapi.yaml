@@ -1,0 +1,823 @@
+openapi: 3.0.3
+info:
+  title: DronePort GCS REST API
+  version: 1.0.0
+  description: |
+    REST API наземной управляющей станции (GCS/НУС) для управления миссиями БВС.
+
+    Базовый формат миссий: WPL.
+
+    Покрывает функциональность:
+      - ФО1: формирование миссии по координатам
+      - ФО2: импорт миссии из WPL файла
+      - ФО3: запуск миссии
+      - ФО4: отмена миссии
+      - ФО5: мониторинг состояния/положения дрона
+      - ФО6: управление группой дронов
+servers:
+  - url: http://localhost:9610/api/v1
+    description: Local development
+
+tags:
+  - name: Auth
+  - name: Health
+  - name: Missions
+  - name: Drones
+  - name: Groups
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Авторизация пользователя
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Обновить пару токенов
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Токены обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Завершить сессию пользователя
+      operationId: logout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Выход выполнен
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Получить профиль текущего пользователя
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Проверка доступности сервиса GCS
+      operationId: getHealth
+      responses:
+        '200':
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /status:
+    get:
+      tags: [Health]
+      summary: Технический статус экземпляра GCS
+      operationId: getServiceStatus
+      responses:
+        '200':
+          description: Статус системы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceStatusResponse'
+
+  /missions:
+    post:
+      tags: [Missions]
+      summary: ФО1. Сформировать миссию в WPL по координатам
+      description: |
+        Формирует миссию для одного дрона по waypoint-координатам
+        и сохраняет её в формате WPL.
+      operationId: createMission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMissionRequest'
+      responses:
+        '201':
+          description: Миссия создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /missions/import-wpl:
+    post:
+      tags: [Missions]
+      summary: ФО2. Импорт миссии из WPL файла
+      description: |
+        Импортирует существующую миссию в формате WPL.
+        Возможны два режима:
+          - multipart/form-data с полем file
+          - application/json с сырым содержимым WPL в поле wplContent
+      operationId: importMissionWpl
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportMissionWplMultipartRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportMissionWplJsonRequest'
+      responses:
+        '201':
+          description: Миссия импортирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /missions/{missionId}:
+    get:
+      tags: [Missions]
+      summary: Получить миссию
+      operationId: getMission
+      parameters:
+        - $ref: '#/components/parameters/MissionId'
+      responses:
+        '200':
+          description: Данные миссии
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /missions/{missionId}/start:
+    post:
+      tags: [Missions]
+      summary: ФО3. Запустить миссию
+      operationId: startMission
+      parameters:
+        - $ref: '#/components/parameters/MissionId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartMissionRequest'
+      responses:
+        '202':
+          description: Команда запуска принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /missions/{missionId}/cancel:
+    post:
+      tags: [Missions]
+      summary: ФО4. Отменить миссию
+      operationId: cancelMission
+      parameters:
+        - $ref: '#/components/parameters/MissionId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelMissionRequest'
+      responses:
+        '202':
+          description: Команда отмены принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationAcceptedResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /drones/{droneId}/status:
+    get:
+      tags: [Drones]
+      summary: ФО5. Получить состояние и положение дрона
+      operationId: getDroneStatus
+      parameters:
+        - $ref: '#/components/parameters/DroneId'
+      responses:
+        '200':
+          description: Текущее состояние дрона
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DroneStatusResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /groups:
+    post:
+      tags: [Groups]
+      summary: ФО6. Создать группу дронов
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Группа создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /groups/{groupId}:
+    get:
+      tags: [Groups]
+      summary: Получить информацию о группе
+      operationId: getGroup
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Данные группы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /groups/{groupId}/mission:
+    post:
+      tags: [Groups]
+      summary: ФО6. Назначить WPL-миссию группе дронов
+      operationId: assignGroupMission
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignGroupMissionRequest'
+      responses:
+        '202':
+          description: Команда назначения миссии принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationAcceptedResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /groups/{groupId}/mission/cancel:
+    post:
+      tags: [Groups]
+      summary: ФО6. Отменить миссию группы
+      operationId: cancelGroupMission
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelGroupMissionRequest'
+      responses:
+        '202':
+          description: Команда отмены миссии группы принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationAcceptedResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    MissionId:
+      name: missionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Уникальный идентификатор миссии
+
+    DroneId:
+      name: droneId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Идентификатор дрона
+
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Уникальный идентификатор группы
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Ошибка авторизации
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Конфликт текущего состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    UnprocessableEntity:
+      description: Невозможно обработать запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh JWT для получения новой пары токенов
+
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh JWT для немедленной ревокации (если используется)
+
+    TokenPairResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Время жизни access token в секундах
+
+    UserProfileResponse:
+      type: object
+      required: [userId, username, roles]
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    HealthResponse:
+      type: object
+      required: [status, system_id, system_type]
+      properties:
+        status:
+          type: string
+          enum: [healthy, starting]
+        system_id:
+          type: string
+        system_type:
+          type: string
+
+    ServiceStatusResponse:
+      type: object
+      required: [system_id, system_type, topic, running, handlers]
+      properties:
+        system_id:
+          type: string
+        system_type:
+          type: string
+        topic:
+          type: string
+        running:
+          type: boolean
+        handlers:
+          type: array
+          items:
+            type: string
+
+    MissionType:
+      type: string
+      enum: [single, group]
+
+    MissionStatus:
+      type: string
+      enum: [draft, ready, running, completed, cancelled, failed]
+
+    MissionResponse:
+      type: object
+      required: [missionId, missionType, status, format, createdAt]
+      properties:
+        missionId:
+          type: string
+          format: uuid
+        missionType:
+          $ref: '#/components/schemas/MissionType'
+        status:
+          $ref: '#/components/schemas/MissionStatus'
+        name:
+          type: string
+        droneId:
+          type: string
+          nullable: true
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        waypoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Waypoint'
+          description: Декодированные точки маршрута (опционально, если выполнен парсинг WPL)
+        format:
+          type: string
+          enum: [wpl]
+        source:
+          type: string
+          enum: [wpl]
+        wplContent:
+          type: string
+          description: Исходное содержимое миссии в формате WPL
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Waypoint:
+      type: object
+      required: [lat, lon, alt]
+      properties:
+        seq:
+          type: integer
+          minimum: 0
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        lon:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        alt:
+          type: number
+          format: double
+          minimum: 0
+        speed:
+          type: number
+          format: double
+          minimum: 0
+        holdSec:
+          type: number
+          format: double
+          minimum: 0
+
+    CreateMissionRequest:
+      type: object
+      required: [droneId, waypoints]
+      description: Входные данные для формирования новой WPL-миссии по координатам.
+      properties:
+        name:
+          type: string
+          maxLength: 128
+        droneId:
+          type: string
+        waypoints:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Waypoint'
+        startImmediately:
+          type: boolean
+          default: false
+
+    ImportMissionWplMultipartRequest:
+      type: object
+      required: [droneId, file]
+      properties:
+        droneId:
+          type: string
+        name:
+          type: string
+          maxLength: 128
+        file:
+          type: string
+          format: binary
+          description: Файл миссии в формате WPL
+        startImmediately:
+          type: boolean
+          default: false
+
+    ImportMissionWplJsonRequest:
+      type: object
+      required: [droneId, wplContent]
+      properties:
+        droneId:
+          type: string
+        name:
+          type: string
+          maxLength: 128
+        wplContent:
+          type: string
+          description: Содержимое WPL файла в текстовом виде
+        startImmediately:
+          type: boolean
+          default: false
+
+    StartMissionRequest:
+      type: object
+      properties:
+        safetyChecks:
+          type: boolean
+          default: true
+
+    CancelMissionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 512
+
+    OperationAcceptedResponse:
+      type: object
+      required: [operationId, status, acceptedAt]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted]
+        acceptedAt:
+          type: string
+          format: date-time
+
+    DroneStatus:
+      type: object
+      required: [droneId, state, batteryPercent, telemetryAt]
+      properties:
+        droneId:
+          type: string
+        state:
+          type: string
+          enum: [idle, armed, taking_off, in_mission, returning, landing, charging, error, offline]
+        missionId:
+          type: string
+          format: uuid
+          nullable: true
+        position:
+          $ref: '#/components/schemas/GeoPoint'
+        batteryPercent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        speedMps:
+          type: number
+          format: float
+          minimum: 0
+        headingDeg:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 360
+        telemetryAt:
+          type: string
+          format: date-time
+
+    GeoPoint:
+      type: object
+      required: [lat, lon, alt]
+      properties:
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        lon:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        alt:
+          type: number
+          format: double
+
+    DroneStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/DroneStatus'
+
+    CreateGroupRequest:
+      type: object
+      required: [name, droneIds]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        droneIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+
+    GroupResponse:
+      type: object
+      required: [groupId, name, droneIds, createdAt]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        droneIds:
+          type: array
+          items:
+            type: string
+        activeMissionId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssignGroupMissionRequest:
+      type: object
+      required: [mission]
+      properties:
+        mission:
+          type: object
+          required: [wplContent]
+          properties:
+            name:
+              type: string
+            wplContent:
+              type: string
+              description: Содержимое миссии в формате WPL
+            startImmediately:
+              type: boolean
+              default: true
+
+    CancelGroupMissionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 512
+
+    ErrorResponse:
+      type: object
+      required: [error, message, timestamp]
+      properties:
+        error:
+          type: string
+          example: bad_request
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time

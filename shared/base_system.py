@@ -13,7 +13,13 @@ import threading
 import signal
 import sys
 
-from flask import Flask, jsonify
+try:
+    from flask import Flask, jsonify
+    FLASK_AVAILABLE = True
+except ImportError:
+    Flask = Any  # type: ignore
+    jsonify = None  # type: ignore
+    FLASK_AVAILABLE = False
 
 from broker.system_bus import SystemBus
 from shared.messages import create_response
@@ -194,6 +200,12 @@ class BaseSystem(ABC):
     def _setup_health_check(self):
         """Настраивает Flask app для health check."""
         if not self.health_port:
+            return
+
+        if not FLASK_AVAILABLE:
+            print(
+                f"[{self.system_id}] Flask is not installed; health endpoint is disabled"
+            )
             return
         
         self._health_app = Flask(f"{self.system_type}_health")

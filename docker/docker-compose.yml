@@ -90,6 +90,22 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: gcs_redis_db
+    profiles: ["kafka", "mqtt"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - drones_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   dummy_system_a:
     build:
       context: ..
@@ -150,6 +166,236 @@ services:
       - PYTHONUNBUFFERED=1
     ports:
       - "${DUMMY_PORT_B:-9701}:${DUMMY_PORT_B:-9701}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_redis_component:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_redis_component
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+    environment:
+      - SYSTEM_TYPE=gcs_redis
+      - SYSTEM_ID=gcs_redis_component
+      - HEALTH_PORT=${GCS_REDIS_PORT:-9806}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_REDIS_PORT:-9806}:${GCS_REDIS_PORT:-9806}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_mission:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_mission
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+      gcs_redis_component:
+        condition: service_started
+    environment:
+      - SYSTEM_TYPE=gcs_mission
+      - SYSTEM_ID=gcs_mission_001
+      - HEALTH_PORT=${GCS_MISSION_PORT:-9800}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_MISSION_PORT:-9800}:${GCS_MISSION_PORT:-9800}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_orchestrator
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+      gcs_redis_component:
+        condition: service_started
+      gcs_fleet:
+        condition: service_started
+      gcs_robot:
+        condition: service_started
+    environment:
+      - SYSTEM_TYPE=gcs_orchestrator
+      - SYSTEM_ID=gcs_orchestrator_001
+      - HEALTH_PORT=${GCS_ORCHESTRATOR_PORT:-9801}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_ORCHESTRATOR_PORT:-9801}:${GCS_ORCHESTRATOR_PORT:-9801}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_fleet:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_fleet
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+      gcs_redis_component:
+        condition: service_started
+    environment:
+      - SYSTEM_TYPE=gcs_fleet
+      - SYSTEM_ID=gcs_fleet_001
+      - HEALTH_PORT=${GCS_FLEET_PORT:-9802}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_FLEET_PORT:-9802}:${GCS_FLEET_PORT:-9802}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_robot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_robot
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+      gcs_redis_component:
+        condition: service_started
+    environment:
+      - SYSTEM_TYPE=gcs_robot
+      - SYSTEM_ID=gcs_robot_001
+      - HEALTH_PORT=${GCS_ROBOT_PORT:-9803}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_ROBOT_PORT:-9803}:${GCS_ROBOT_PORT:-9803}"
+    networks:
+      - drones_net
+    restart: unless-stopped
+
+  gcs_telemetry:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gcs_telemetry
+    profiles: ["kafka", "mqtt"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      mosquitto:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+      gcs_redis_component:
+        condition: service_started
+    environment:
+      - SYSTEM_TYPE=gcs_telemetry
+      - SYSTEM_ID=gcs_telemetry_001
+      - HEALTH_PORT=${GCS_TELEMETRY_PORT:-9804}
+      - BROKER_TYPE=${BROKER_TYPE:-kafka}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - KAFKA_SASL_ENABLED=${KAFKA_SASL_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${GCS_TELEMETRY_PORT:-9804}:${GCS_TELEMETRY_PORT:-9804}"
     networks:
       - drones_net
     restart: unless-stopped
