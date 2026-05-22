@@ -1,0 +1,220 @@
+<mxfile host="Electron" agent="Codex">
+  <diagram id="gcs-trust-short" name="C2 Containers Trust Short">
+    <mxGraphModel dx="5173" dy="3017" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1740" pageHeight="930" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="su7MW_qIAI7JInSkQqXa-21" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="1210" width="1720" x="-190" y="-330" as="geometry" />
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-14" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#090304;container=0;" value="" vertex="1">
+          <mxGeometry height="1210" width="1720" as="geometry" />
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-51" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=8 8;container=0;" value="" vertex="1">
+          <mxGeometry height="740" width="880" x="400" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="operator" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6464;strokeColor=#E65B5B;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Эксплуатант&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;Внешняя система&lt;br&gt;постановки задач&lt;/font&gt;" vertex="1">
+          <mxGeometry height="88" width="160" x="80" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="drone" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6464;strokeColor=#E65B5B;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Дрон&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;Внешняя система,&lt;br&gt;выполняющая миссии&lt;br&gt;и отдающая телеметрию&lt;/font&gt;" vertex="1">
+          <mxGeometry height="104" width="160" x="80" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="operator" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="gateway" value="task.plan&lt;br&gt;task.assign&lt;br&gt;task.start">
+          <mxGeometry relative="1" x="0.1877" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="190" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;" target="operator" value="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(46, 125, 50), rgb(100, 168, 104));&quot;&gt;построенный маршрут&lt;/span&gt;">
+          <mxGeometry relative="1" x="0.1469" y="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="490" y="459" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="drone" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;exitX=1.003;exitY=0.767;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.205;entryY=0.983;entryDx=0;entryDy=0;entryPerimeter=0;" target="gateway" value="телеметрия дрона">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="465" y="660" />
+            </Array>
+            <mxPoint x="310" y="660" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;entryX=1.007;entryY=0.161;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.002;exitY=0.774;exitDx=0;exitDy=0;exitPerimeter=0;" target="drone" value="mission.upload,&lt;div&gt;mission.start,&lt;/div&gt;&lt;div&gt;telemetry.get&lt;/div&gt;">
+          <mxGeometry relative="1" x="-0.0661" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gateway" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD966;strokeColor=#E8A84A;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Gateway&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;M/S&lt;br&gt;аутентификация,&lt;br&gt;авторизация, валидация&lt;/font&gt;" vertex="1">
+          <mxGeometry height="112" width="170" x="430" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-1" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD966;strokeColor=#E8A84A;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;DroneManager&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;M/S&lt;br&gt;загрузка и старт миссии,&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;валидация WPL&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="112" width="180" x="860" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="pOas3nr_MHYjZqSyCLpv-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=none;endFill=0;entryX=0.169;entryY=-0.01;entryDx=0;entryDy=0;startArrow=block;startFill=1;exitX=0.475;exitY=0.024;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" target="pOas3nr_MHYjZqSyCLpv-1" value="telemetry.start">
+          <mxGeometry relative="1" x="-0.2927" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="696" y="460" />
+              <mxPoint x="890" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pathplanner" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#97D077;strokeColor=#97D077;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;PathPlanner&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;S/S&lt;br&gt;построение маршрута&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="175" x="435" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;exitX=0.413;exitY=1.004;exitDx=0;exitDy=0;exitPerimeter=0;" target="pathplanner" value="task.plan">
+          <mxGeometry relative="1" x="-0.3814" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="500" y="790" />
+              <mxPoint x="500" y="790" />
+            </Array>
+            <mxPoint x="710" y="482" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="missionconverter" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6464;strokeColor=#FF6464;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;MissionConverter&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;M/M&lt;br&gt;доверенная конвертация&lt;br&gt;миссии в WPL&lt;/font&gt;" vertex="1">
+          <mxGeometry height="112" width="190" x="860" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-2" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;exitX=0.527;exitY=0.012;exitDx=0;exitDy=0;exitPerimeter=0;" value="mission.convert">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="990.14" y="418.65999999999997" />
+              <mxPoint x="990.14" y="418.65999999999997" />
+            </Array>
+            <mxPoint x="989.9999999999997" y="500.00400000000025" as="sourcePoint" />
+            <mxPoint x="990.0566666666665" y="390.6600000000002" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-23" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;startFill=0;entryX=0;entryY=0.714;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryPerimeter=0;" target="pOas3nr_MHYjZqSyCLpv-1" value="task.assign,&amp;nbsp;&lt;div&gt;task.start&lt;/div&gt;">
+          <mxGeometry relative="1" x="0.0076" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+            <mxPoint x="600" y="580" as="sourcePoint" />
+            <mxPoint x="860" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-24" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6464;strokeColor=#FF6464;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;TelemetryCaller&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;S/M&lt;br&gt;систематический&lt;br&gt;запрос телеметрии у дрона&lt;/font&gt;" vertex="1">
+          <mxGeometry height="112" width="180" x="610" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-25" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="pOas3nr_MHYjZqSyCLpv-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;exitX=-0.005;exitY=0.619;exitDx=0;exitDy=0;exitPerimeter=0;" target="gateway" value="telemetry.get">
+          <mxGeometry relative="1" x="-0.1667" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="560" y="349" />
+            </Array>
+            <mxPoint x="629.96" y="350" as="sourcePoint" />
+            <mxPoint x="559.997037037037" y="524" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-26" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=none;endFill=0;startArrow=block;startFill=1;entryX=0.001;entryY=0.282;entryDx=0;entryDy=0;exitX=0.998;exitY=0.181;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" target="pOas3nr_MHYjZqSyCLpv-1" value="mission.upload,&lt;div&gt;mission.start&lt;/div&gt;">
+          <mxGeometry relative="1" x="0.0769" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+            <mxPoint x="600.5599999999998" y="530.2719999999999" as="sourcePoint" />
+            <mxPoint x="860.0000000000003" y="521.1680000000001" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pOas3nr_MHYjZqSyCLpv-49" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="missionconverter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;entryX=0.311;entryY=-0.006;entryDx=0;entryDy=0;entryPerimeter=0;" target="pOas3nr_MHYjZqSyCLpv-1" value="WPL миссии">
+          <mxGeometry relative="1" x="-0.1864" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="916" y="430" />
+            </Array>
+            <mxPoint x="1210" y="522" as="sourcePoint" />
+            <mxPoint x="1110" y="322" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="securitymonitor" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD966;strokeColor=#E8A84A;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;SecurityMonitor&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;M/M&lt;br&gt;мониторинг событий&lt;br&gt;и выявление нарушений&lt;/font&gt;" vertex="1">
+          <mxGeometry height="112" width="190" x="1040" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-4" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=none;endFill=0;exitX=0.413;exitY=1.004;exitDx=0;exitDy=0;exitPerimeter=0;startArrow=block;startFill=1;entryX=0.625;entryY=-0.004;entryDx=0;entryDy=0;entryPerimeter=0;" target="pathplanner" value="построенный&amp;nbsp;&lt;div&gt;маршрут&lt;/div&gt;">
+          <mxGeometry relative="1" x="0.1544" y="1" as="geometry">
+            <mxPoint y="1" as="offset" />
+            <Array as="points" />
+            <mxPoint x="540" y="622" as="sourcePoint" />
+            <mxPoint x="540" y="840" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-5" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="pOas3nr_MHYjZqSyCLpv-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=none;endFill=0;exitX=0;exitY=0.25;exitDx=0;exitDy=0;startArrow=block;startFill=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="gateway" value="телеметрия дрона">
+          <mxGeometry relative="1" x="-0.3603" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+            <mxPoint x="515.3299999999999" y="312" as="sourcePoint" />
+            <mxPoint x="514.3299999999999" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-6" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" value="event.telemetry">
+          <mxGeometry relative="1" x="-0.1667" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="740" y="220" />
+              <mxPoint x="1190" y="220" />
+            </Array>
+            <mxPoint x="740" y="280" as="sourcePoint" />
+            <mxPoint x="1190.0000000000005" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-7" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="pOas3nr_MHYjZqSyCLpv-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="event.convert,&lt;div&gt;event.upload,&lt;/div&gt;&lt;div&gt;event.start&lt;/div&gt;">
+          <mxGeometry relative="1" x="0.0076" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1100" y="556" />
+            </Array>
+            <mxPoint x="1060" y="555.9999999999998" as="sourcePoint" />
+            <mxPoint x="1099.9999999999995" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-8" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="missionconverter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;html=1;strokeColor=#E53935;fontColor=#C62828;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="securitymonitor" value="event.convert">
+          <mxGeometry relative="1" x="-0.1667" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1140" y="336" />
+            </Array>
+            <mxPoint x="1140" y="280" as="sourcePoint" />
+            <mxPoint x="1590.0000000000005" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-9" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="pathplanner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="securitymonitor" value="event.plan">
+          <mxGeometry relative="1" x="0.0076" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+            <mxPoint x="640" y="824.33" as="sourcePoint" />
+            <mxPoint x="900" y="824.33" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-10" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;startFill=0;entryX=0.104;entryY=-0.004;entryDx=0;entryDy=0;exitX=0.822;exitY=1.003;exitDx=0;exitDy=0;entryPerimeter=0;exitPerimeter=0;" target="securitymonitor" value="event.request">
+          <mxGeometry relative="1" x="0.0076" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="570" y="680" />
+              <mxPoint x="1060" y="680" />
+            </Array>
+            <mxPoint x="720" y="790" as="sourcePoint" />
+            <mxPoint x="980" y="790" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-16" parent="su7MW_qIAI7JInSkQqXa-21" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;container=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Цели безопасности&lt;/h1&gt;&lt;p&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;1. При любых обстоятельствах для планирования перемещения используются только подлинные заказы.&lt;/font&gt;&lt;/p&gt;&lt;p&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;2. При любых обстоятельствах конфиденциальная информация системы доступна только авторизованным пользователям.&lt;/font&gt;&lt;/p&gt;&lt;p&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;3. При любых обстоятельствах выполняются только аутентичные и авторизованные команды.&lt;/font&gt;&lt;/p&gt;&lt;p&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;4. При любых обстоятельствах НУС передаёт целостную и подлинную критичную информацию.&lt;/font&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="410" width="360" x="1320" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-17" parent="su7MW_qIAI7JInSkQqXa-21" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;container=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Шаблоны СКИБ&lt;/h1&gt;&lt;li data-section-id=&quot;g7hkx4&quot; data-start=&quot;153&quot; data-end=&quot;266&quot;&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;strong data-start=&quot;155&quot; data-end=&quot;186&quot; style=&quot;&quot;&gt;Gateway (шлюз безопасности)&lt;/strong&gt; — централизованная аутентификация, авторизация и валидация входящих запросов.&lt;br&gt;&lt;/font&gt;&lt;/li&gt;&lt;li data-section-id=&quot;1hxf98g&quot; data-start=&quot;267&quot; data-end=&quot;412&quot;&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;&lt;strong data-start=&quot;269&quot; data-end=&quot;303&quot;&gt;Trusted Core (доверенное ядро)&lt;/strong&gt; — критичная логика (планирование маршрута, формирование и запуск миссии) вынесена в доверенные компоненты.&lt;br&gt;&lt;/font&gt;&lt;/li&gt;&lt;li data-section-id=&quot;3bm8kr&quot; data-start=&quot;413&quot; data-end=&quot;548&quot;&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;&lt;strong data-start=&quot;415&quot; data-end=&quot;461&quot;&gt;Input Validation (проверка входных данных)&lt;/strong&gt; — проверка корректности и подлинности заказов и миссий.&lt;br&gt;&lt;/font&gt;&lt;/li&gt;&lt;li data-section-id=&quot;12112bh&quot; data-start=&quot;549&quot; data-end=&quot;641&quot;&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;&lt;strong data-start=&quot;551&quot; data-end=&quot;594&quot;&gt;Security Monitor (монитор безопасности)&lt;/strong&gt; — сбор событий, аудит и выявление нарушений.&lt;br&gt;&lt;/font&gt;&lt;/li&gt;&lt;p&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;strong data-start=&quot;644&quot; data-end=&quot;688&quot; style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Separation of Trust (разделение доверия)&lt;/strong&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt; — разделение компонентов на доверенные и недоверенные, минимизация доверенной базы.&lt;/span&gt;&lt;/font&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="420" width="360" x="1320" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-19" edge="1" parent="su7MW_qIAI7JInSkQqXa-21" source="securitymonitor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2ECA45;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;startFill=0;" value="передача логов">
+          <mxGeometry relative="1" x="0.0076" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points" />
+            <mxPoint x="1080" y="880" as="sourcePoint" />
+            <mxPoint x="1140" y="1010" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="su7MW_qIAI7JInSkQqXa-20" parent="su7MW_qIAI7JInSkQqXa-21" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6464;strokeColor=#E8A84A;container=0;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Инфопанель&lt;/b&gt;&lt;br&gt;&lt;/font&gt;&lt;hr&gt;&lt;font color=&quot;#000000&quot;&gt;общесистемный журнал, мониторинг событий&lt;/font&gt;" vertex="1">
+          <mxGeometry height="112" width="190" x="1040" y="1010" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
