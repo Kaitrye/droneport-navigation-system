@@ -117,6 +117,10 @@ services:
     environment:
       - SYSTEM_ID=gcs
       - SYSTEM_NAMESPACE=${SYSTEM_NAMESPACE:-}
+      - AGRODRON_SECURITY_MONITOR_TOPIC=${AGRODRON_SECURITY_MONITOR_TOPIC:-v1.Agrodron.Agrodron001.security_monitor}
+      - AGRODRON_MISSION_HANDLER_TOPIC=${AGRODRON_MISSION_HANDLER_TOPIC:-v1.Agrodron.Agrodron001.mission_handler}
+      - AGRODRON_AUTOPILOT_TOPIC=${AGRODRON_AUTOPILOT_TOPIC:-v1.Agrodron.Agrodron001.autopilot}
+      - AGRODRON_TELEMETRY_TOPIC=${AGRODRON_TELEMETRY_TOPIC:-v1.Agrodron.Agrodron001.telemetry}
       - BROKER_TYPE=${BROKER_TYPE:-kafka}
       - BROKER_USER=${ADMIN_USER:-admin}
       - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}

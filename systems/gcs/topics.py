@@ -23,6 +23,7 @@ class DroneTopics:
 
 class DroneActions:
     PROXY_REQUEST = "proxy_request"
+    PROXY_PUBLISH = "proxy_publish"
     LOAD_MISSION = "load_mission"
     CMD = "cmd"
     TELEMETRY_GET = "get_state"

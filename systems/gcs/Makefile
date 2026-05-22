@@ -25,24 +25,23 @@ prepare:
 
 docker-up: prepare
 	@set -a && . $(GENERATED)/.env && set +a && \
-		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-kafka} up -d --build
+		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-mqtt} up -d --build
 
 docker-up-no-broker: prepare
 	@set -a && . $(GENERATED)/.env && set +a && \
-		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-kafka} up -d --build --no-deps \
-		redis mission_store drone_store mission_converter orchestrator path_planner drone_manager
+		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-mqtt} up -d --build --no-deps \
+		redis mission_store drone_store mission_converter orchestrator gateway path_planner drone_manager
 
 docker-down:
-	-$(DOCKER_COMPOSE) --profile kafka down 2>/dev/null
 	-$(DOCKER_COMPOSE) --profile mqtt down 2>/dev/null
 
 docker-down-no-broker:
 	-@set -a && . $(GENERATED)/.env && set +a && \
-		$(DOCKER_COMPOSE) rm -sf mission_store drone_store mission_converter orchestrator path_planner drone_manager redis 2>/dev/null
+		$(DOCKER_COMPOSE) rm -sf mission_store drone_store mission_converter orchestrator gateway path_planner drone_manager redis 2>/dev/null
 
 docker-logs:
 	@set -a && . $(GENERATED)/.env && set +a && \
-		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-kafka} logs -f
+		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-mqtt} logs -f
 
 unit-test:
 	@$(UNIT_PYTEST) --cov=systems.gcs --cov-config=systems/gcs/.coveragerc --cov-report=term
@@ -53,7 +52,7 @@ unit-test-cov:
 integration-test: docker-up
 	@echo "Waiting for broker and gcs components..."
 	@sleep 30
-	@set -a && . $(GENERATED)/.env && set +a && $(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-kafka} ps
+	@set -a && . $(GENERATED)/.env && set +a && $(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-mqtt} ps
 	@$(MAKE) integration-test-no-up
 
 integration-test-no-up:

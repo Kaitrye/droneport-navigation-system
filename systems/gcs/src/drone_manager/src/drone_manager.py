@@ -9,7 +9,9 @@ from typing import Any, Dict
 
 from broker.src.system_bus import SystemBus
 from sdk.base_component import BaseComponent
-from ....topics import DroneActions, DroneTopics
+from ....topics import DroneActions
+from ...gateway.topics import ExternalTopics as GatewayExternalTopics
+from ...gateway.topics import GatewayActions, SystemTopics
 from ...contracts import DroneStatus, MissionStatus
 from ..topics import ComponentTopics, DroneManagerActions
 from ...mission_store.topics import MissionStoreActions
@@ -35,18 +37,17 @@ class DroneManagerComponent(BaseComponent):
 
     def _proxy_request_drone(
         self,
-        target_topic: str,
         target_action: str,
         data: Dict[str, Any],
         correlation_id: str | None = None,
         timeout: float = 10.0,
     ) -> Dict[str, Any] | None:
         message = {
-                "action": DroneActions.PROXY_REQUEST,
-                "sender": ComponentTopics.DRONE_MANAGER,
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": GatewayExternalTopics.GCS,
             "payload": {
                 "target": {
-                    "topic": target_topic,
+                    "topic": GatewayExternalTopics.AGRODRON,
                     "action": target_action,
                 },
                 "data": data,
@@ -56,14 +57,13 @@ class DroneManagerComponent(BaseComponent):
             message["correlation_id"] = correlation_id
 
         response = self.bus.request(
-            DroneTopics.SECURITY_MONITOR,
+            SystemTopics.GCS,
             message,
             timeout=timeout,
         )
         logger.info(
-            "[%s] proxy_request target_topic=%s target_action=%s data=%r response=%r",
+            "[%s] proxy_request target_action=%s data=%r response=%r",
             self.component_id,
-            target_topic,
             target_action,
             data,
             response,
@@ -120,7 +120,6 @@ class DroneManagerComponent(BaseComponent):
         )
 
         upload_response = self._proxy_request_drone(
-            DroneTopics.MISSION_HANDLER,
             DroneActions.LOAD_MISSION,
             {
                 "mission_id": mission_id,
@@ -219,7 +218,6 @@ class DroneManagerComponent(BaseComponent):
                 break
 
             response = self._proxy_request_drone(
-                DroneTopics.TELEMETRY,
                 DroneActions.TELEMETRY_GET,
                 {
                     "drone_id": drone_id,
@@ -273,7 +271,6 @@ class DroneManagerComponent(BaseComponent):
         )
 
         start_response = self._proxy_request_drone(
-            DroneTopics.AUTOPILOT,
             DroneActions.CMD,
             {
                 "command": "START",

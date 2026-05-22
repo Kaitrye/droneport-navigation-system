@@ -5,6 +5,8 @@ from ...topics import DroneActions, DroneTopics
 from ...src.contracts import DroneStatus, MissionStatus
 from ...src.drone_manager.src.drone_manager import DroneManagerComponent
 from ...src.drone_manager.topics import ComponentTopics
+from ...src.gateway.topics import ExternalTopics as GatewayExternalTopics
+from ...src.gateway.topics import GatewayActions, SystemTopics
 from ...src.drone_store.topics import DroneStoreActions
 from ...src.mission_store.topics import MissionStoreActions
 
@@ -29,13 +31,13 @@ def test_handle_mission_upload(component, mock_bus):
     )
 
     mock_bus.request.assert_called_once_with(
-        DroneTopics.SECURITY_MONITOR,
+        SystemTopics.GCS,
         {
-            "action": DroneActions.PROXY_REQUEST,
-            "sender": ComponentTopics.DRONE_MANAGER,
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": GatewayExternalTopics.GCS,
             "payload": {
                 "target": {
-                    "topic": DroneTopics.MISSION_HANDLER,
+                    "topic": GatewayExternalTopics.AGRODRON,
                     "action": DroneActions.LOAD_MISSION,
                 },
                 "data": {
@@ -121,18 +123,32 @@ def test_proxy_request_drone_unwraps_security_monitor_payload(component, mock_bu
     }
 
     response = component._proxy_request_drone(
-        DroneTopics.TELEMETRY,
         DroneActions.TELEMETRY_GET,
         {"drone_id": "dr-2"},
     )
 
     assert response == nested_response
+    mock_bus.request.assert_called_once_with(
+        SystemTopics.GCS,
+        {
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": GatewayExternalTopics.GCS,
+            "payload": {
+                "target": {
+                    "topic": GatewayExternalTopics.AGRODRON,
+                    "action": DroneActions.TELEMETRY_GET,
+                },
+                "data": {"drone_id": "dr-2"},
+            },
+        },
+        timeout=10.0,
+    )
 
 
 def test_proxy_request_drone_returns_none_for_non_dict_response(component, mock_bus):
     mock_bus.request.return_value = "bad-response"
 
-    assert component._proxy_request_drone(DroneTopics.TELEMETRY, DroneActions.TELEMETRY_GET, {"drone_id": "dr-2"}) is None
+    assert component._proxy_request_drone(DroneActions.TELEMETRY_GET, {"drone_id": "dr-2"}) is None
 
 
 def test_unwrap_target_response_returns_none_for_non_dict(component):
@@ -208,13 +224,13 @@ def test_handle_mission_start(component, mock_bus, monkeypatch):
     )
 
     mock_bus.request.assert_called_once_with(
-        DroneTopics.SECURITY_MONITOR,
+        SystemTopics.GCS,
         {
-            "action": DroneActions.PROXY_REQUEST,
-            "sender": ComponentTopics.DRONE_MANAGER,
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": GatewayExternalTopics.GCS,
             "payload": {
                 "target": {
-                    "topic": DroneTopics.AUTOPILOT,
+                    "topic": GatewayExternalTopics.AGRODRON,
                     "action": DroneActions.CMD,
                 },
                 "data": {
@@ -305,13 +321,13 @@ def test_poll_telemetry_loop_requests_drone_and_saves_response(component, mock_b
     component._poll_telemetry_loop("dr-9", OneShotEvent())
 
     mock_bus.request.assert_called_once_with(
-        DroneTopics.SECURITY_MONITOR,
+        SystemTopics.GCS,
         {
-            "action": DroneActions.PROXY_REQUEST,
-            "sender": ComponentTopics.DRONE_MANAGER,
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": GatewayExternalTopics.GCS,
             "payload": {
                 "target": {
-                    "topic": DroneTopics.TELEMETRY,
+                    "topic": GatewayExternalTopics.AGRODRON,
                     "action": DroneActions.TELEMETRY_GET,
                 },
                 "data": {"drone_id": "dr-9"},

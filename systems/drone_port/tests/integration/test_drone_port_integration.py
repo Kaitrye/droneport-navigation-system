@@ -10,10 +10,9 @@ import uuid
 
 import pytest
 
-from systems.drone_port.src.charging_manager.topics import ComponentTopics as ChargingTopics, ChargingManagerActions
-from systems.drone_port.src.drone_registry.topics import ComponentTopics as RegistryTopics, DroneRegistryActions
-from systems.drone_port.src.orchestrator.topics import ComponentTopics as OrchestratorTopics, OrchestratorActions
-from systems.drone_port.src.state_store.topics import ComponentTopics as StateStoreTopics, StateStoreActions
+from systems.drone_port.src.gateway.topics import ExternalTopics as GatewayExternalTopics
+from systems.drone_port.src.gateway.topics import GatewayActions, SystemTopics
+from systems.drone_port.src.orchestrator.topics import OrchestratorActions
 
 
 DEFAULT_BROKER_TYPE = "mqtt"
@@ -74,94 +73,82 @@ def system_bus():
     bus.stop()
 
 
-def test_state_store_returns_seeded_ports(system_bus):
-    response = system_bus.request(
-        StateStoreTopics.STATE_STORE,
+def _gateway_request(system_bus, sender: str, action: str, payload: dict, timeout: float = 10.0):
+    return system_bus.request(
+        SystemTopics.DRONE_PORT,
         {
-            "action": StateStoreActions.GET_ALL_PORTS,
-            "sender": "test_client",
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-    if response is None:
-        pytest.skip("No response from state_store. Run: make drone-port-system-up")
-
-    assert response.get("success") is True
-    assert len(response["payload"]["ports"]) >= 4
-    assert {"lat", "lon"} <= set(response["payload"]["ports"][0].keys())
-
-
-def test_charging_flow_updates_registry_and_orchestrator_responds(system_bus):
-    drone_id = f"DR-CHARGE-{uuid.uuid4().hex[:6]}"
-    system_bus.publish(
-        RegistryTopics.DRONE_REGISTRY,
-        {
-            "action": DroneRegistryActions.REGISTER_DRONE,
-            "sender": "test_client",
-            "payload": {"drone_id": drone_id, "model": "TestModel"},
-        },
-    )
-    time.sleep(1)
-
-    system_bus.publish(
-        ChargingTopics.CHARGING_MANAGER,
-        {
-            "action": ChargingManagerActions.START_CHARGING,
-            "sender": "test_client",
-            "payload": {"drone_id": drone_id, "battery": 95.0},
-        },
-    )
-
-    registry_response = None
-    for _ in range(15):
-        registry_response = system_bus.request(
-            RegistryTopics.DRONE_REGISTRY,
-            {
-                "action": DroneRegistryActions.GET_DRONE,
-                "sender": "test_client",
-                "payload": {"drone_id": drone_id},
+            "action": GatewayActions.PROXY_REQUEST,
+            "sender": sender,
+            "payload": {
+                "target": {
+                    "topic": GatewayExternalTopics.DRONE_PORT,
+                    "action": action,
+                },
+                "data": payload,
             },
-            timeout=5.0,
+        },
+        timeout=timeout,
+    )
+
+
+def _gateway_target_response(response: dict) -> dict:
+    payload = response.get("payload", {})
+    target_response = payload.get("target_response", {})
+    return target_response if isinstance(target_response, dict) else {}
+
+
+def test_get_available_drones_via_gateway(system_bus):
+    gateway_response = _gateway_request(
+        system_bus,
+        GatewayExternalTopics.OPERATOR,
+        OrchestratorActions.GET_AVAILABLE_DRONES,
+        {},
+    )
+    if gateway_response is None:
+        pytest.skip("No response from gateway. Run: make drone-port-system-up")
+
+    orchestrator_response = _gateway_target_response(gateway_response)
+    assert orchestrator_response.get("success") is True
+    payload = orchestrator_response["payload"]
+    assert isinstance(payload.get("drones"), list)
+    assert "from" in payload
+
+
+def test_landing_flow_via_gateway_makes_drone_available(system_bus):
+    drone_id = f"DR-LAND-{uuid.uuid4().hex[:6]}"
+
+    landing_response = _gateway_request(
+        system_bus,
+        GatewayExternalTopics.AGRODRON,
+        GatewayActions.REQUEST_LANDING,
+        {"drone_id": drone_id, "model": "TestModel", "battery": 95.0},
+    )
+    if landing_response is None:
+        pytest.skip("No response from gateway. Run: make drone-port-system-up")
+
+    drone_manager_response = _gateway_target_response(landing_response)
+    assert drone_manager_response.get("success") is True
+    landing_payload = drone_manager_response["payload"]
+    assert landing_payload.get("approved") is True
+    assert landing_payload.get("drone_id") == drone_id
+
+    available_response = None
+    for _ in range(15):
+        available_response = _gateway_request(
+            system_bus,
+            GatewayExternalTopics.OPERATOR,
+            OrchestratorActions.GET_AVAILABLE_DRONES,
+            {},
         )
-        if registry_response and registry_response.get("success") and registry_response["payload"].get("battery") == 100.0:
+        available_payload = _gateway_target_response(available_response or {}).get("payload", {})
+        drones = available_payload.get("drones", [])
+        if any(drone.get("drone_id") == drone_id for drone in drones):
             break
         time.sleep(1)
 
-    if registry_response is None:
-        pytest.skip("No response from drone_registry. Run: make drone-port-system-up")
+    if available_response is None:
+        pytest.skip("No response from gateway. Run: make drone-port-system-up")
 
-    assert registry_response.get("success") is True
-    assert registry_response["payload"]["status"] == "ready"
-    assert float(registry_response["payload"]["battery"]) == 100.0
-
-    available_response = system_bus.request(
-        RegistryTopics.DRONE_REGISTRY,
-        {
-            "action": DroneRegistryActions.GET_AVAILABLE_DRONES,
-            "sender": "test_client",
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-    assert available_response is not None
-    assert available_response.get("success") is True
-    assert any(
-        drone["drone_id"] == drone_id
-        for drone in available_response["payload"]["drones"]
-    )
-
-    orchestrator_response = system_bus.request(
-        OrchestratorTopics.ORCHESTRATOR,
-        {
-            "action": OrchestratorActions.GET_AVAILABLE_DRONES,
-            "sender": "test_client",
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-    if orchestrator_response is None:
-        pytest.skip("No response from orchestrator. Run: make drone-port-system-up")
-
-    assert orchestrator_response.get("success") is True
-    assert "from" in orchestrator_response["payload"]
+    available_payload = _gateway_target_response(available_response).get("payload", {})
+    drones = available_payload.get("drones", [])
+    assert any(drone.get("drone_id") == drone_id for drone in drones)

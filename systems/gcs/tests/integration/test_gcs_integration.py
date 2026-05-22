@@ -11,16 +11,13 @@ from uuid import uuid4
 
 import pytest
 
-from ...src.mission_converter.topics import ComponentTopics as MissionConverterTopics
-from ...src.mission_converter.topics import MissionActions
 from ...src.mission_store.topics import ComponentTopics as MissionStoreTopics
 from ...src.mission_store.topics import MissionStoreActions
 from ...src.drone_manager.topics import ComponentTopics as DroneManagerTopics
 from ...src.drone_manager.topics import DroneManagerActions
-from ...src.orchestrator.topics import ComponentTopics as OrchestratorTopics
+from ...src.gateway.topics import ExternalTopics as GatewayExternalTopics
+from ...src.gateway.topics import GatewayActions, SystemTopics
 from ...src.orchestrator.topics import OrchestratorActions
-from ...src.path_planner.topics import ComponentTopics as PathPlannerTopics
-from ...src.path_planner.topics import PathPlannerActions
 
 
 def _broker_available(retries=5, delay=2):
@@ -49,6 +46,35 @@ def _request_with_retries(system_bus, topic, message, timeout=10.0, retries=3, d
             return response
         time.sleep(delay)
     return response
+
+
+def _gateway_message(action: str, payload: dict, correlation_id: str | None = None) -> dict:
+    message = {
+        "action": GatewayActions.PROXY_REQUEST,
+        "sender": GatewayExternalTopics.OPERATOR,
+        "payload": {
+            "target": {
+                "topic": GatewayExternalTopics.GCS,
+                "action": action,
+            },
+            "data": payload,
+        },
+    }
+    if correlation_id:
+        message["correlation_id"] = correlation_id
+    return message
+
+
+def _gateway_publish_message(action: str, payload: dict, correlation_id: str | None = None) -> dict:
+    message = _gateway_message(action, payload, correlation_id=correlation_id)
+    message["action"] = GatewayActions.PROXY_PUBLISH
+    return message
+
+
+def _gateway_target_response(response: dict) -> dict:
+    payload = response.get("payload", {})
+    target_response = payload.get("target_response", {})
+    return target_response if isinstance(target_response, dict) else {}
 
 
 def _wait_mission_in_store(system_bus, mission_id, retries=6, delay=1.5, predicate=None):
@@ -82,23 +108,22 @@ def _build_task_payload(start_lat=55.751244, start_lon=37.618423, end_lat=55.761
     }
 
 
-def _create_mission_via_path_planner(system_bus, mission_id: str):
+def _submit_task_via_gateway(system_bus, payload: dict, correlation_id: str | None = None):
     response = _request_with_retries(
         system_bus,
-        PathPlannerTopics.PATH_PLANNER,
-        {
-            "action": PathPlannerActions.PATH_PLAN,
-            "sender": "gcs_integration_test",
-            "payload": {
-                "mission_id": mission_id,
-                "task": _build_task_payload(),
-            },
-        },
+        SystemTopics.GCS,
+        _gateway_message(
+            OrchestratorActions.TASK_SUBMIT,
+            payload,
+            correlation_id=correlation_id,
+        ),
         timeout=15.0,
         retries=3,
-        delay=2.0,
+        delay=3.0,
     )
-    return response
+    if response is None:
+        return None
+    return _gateway_target_response(response)
 
 
 def _capture_messages_during(system_bus, topic: str, trigger, expected_count: int, timeout: float = 12.0):
@@ -167,12 +192,8 @@ def test_task_submit_builds_route_and_saves_mission(system_bus):
     """Orchestrator -> PathPlanner -> MissionStore цепочка через request/response."""
     response = _request_with_retries(
         system_bus,
-        OrchestratorTopics.ORCHESTRATOR,
-        {
-            "action": OrchestratorActions.TASK_SUBMIT,
-            "sender": "gcs_integration_test",
-            "payload": _build_task_payload(),
-        },
+        SystemTopics.GCS,
+        _gateway_message(OrchestratorActions.TASK_SUBMIT, _build_task_payload()),
         timeout=15.0,
         retries=3,
         delay=3.0,
@@ -182,7 +203,9 @@ def test_task_submit_builds_route_and_saves_mission(system_bus):
         pytest.skip("No response from orchestrator. Ensure GCS docker stack is up.")
 
     assert response.get("success") is True
-    payload = response.get("payload", {})
+    target_response = _gateway_target_response(response)
+    assert target_response.get("success") is True
+    payload = target_response.get("payload", {})
     mission_id = payload.get("mission_id")
     waypoints = payload.get("waypoints", [])
 
@@ -201,36 +224,25 @@ def test_task_submit_builds_route_and_saves_mission(system_bus):
     assert mission.get("status") == "created"
 
 
-def test_path_planner_direct_plan_persists_mission(system_bus):
-    """Прямой запрос в PathPlanner сохраняет миссию в MissionStore."""
-    mission_id = f"it-{uuid4().hex[:10]}"
-    response = _request_with_retries(
+def test_custom_task_submit_via_gateway_persists_mission(system_bus):
+    """Gateway task.submit сохраняет миссию в MissionStore."""
+    target_response = _submit_task_via_gateway(
         system_bus,
-        PathPlannerTopics.PATH_PLANNER,
         {
-            "action": PathPlannerActions.PATH_PLAN,
-            "sender": "gcs_integration_test",
-            "payload": {
-                "mission_id": mission_id,
-                "task": {
-                    "waypoints": [
-                        {"lat": 59.9311, "lon": 30.3609, "alt_m": 80},
-                        {"lat": 59.9411, "lon": 30.3709, "alt_m": 95},
-                    ],
-                },
-            },
+            "waypoints": [
+                {"lat": 59.9311, "lon": 30.3609, "alt_m": 80},
+                {"lat": 59.9411, "lon": 30.3709, "alt_m": 95},
+            ],
         },
-        timeout=15.0,
-        retries=3,
-        delay=2.0,
     )
 
-    if response is None:
-        pytest.skip("No response from path_planner. Ensure GCS docker stack is up.")
+    if target_response is None:
+        pytest.skip("No response from gateway. Ensure GCS docker stack is up.")
 
-    assert response.get("success") is True
-    payload = response.get("payload", {})
-    assert payload.get("mission_id") == mission_id
+    assert target_response.get("success") is True
+    payload = target_response.get("payload", {})
+    mission_id = payload.get("mission_id")
+    assert mission_id
     assert isinstance(payload.get("waypoints"), list)
     assert len(payload["waypoints"]) >= 4
 
@@ -243,59 +255,28 @@ def test_path_planner_direct_plan_persists_mission(system_bus):
     assert mission.get("mission_id") == mission_id
 
 
-def test_mission_converter_prepare_returns_wpl(system_bus):
-    """MissionConverter получает миссию из MissionStore и возвращает WPL."""
-    mission_id = f"it-cnv-{uuid4().hex[:8]}"
-    planned = _create_mission_via_path_planner(system_bus, mission_id)
-    if planned is None:
-        pytest.skip("No response from path_planner. Ensure GCS docker stack is up.")
-
-    response = _request_with_retries(
-        system_bus,
-        MissionConverterTopics.MISSION_CONVERTER,
-        {
-            "action": MissionActions.MISSION_PREPARE,
-            "sender": "gcs_integration_test",
-            "payload": {"mission_id": mission_id},
-        },
-        timeout=20.0,
-        retries=3,
-        delay=2.0,
-    )
-
-    if response is None:
-        pytest.skip("No response from mission_converter. Ensure GCS docker stack is up.")
-
-    assert response.get("success") is True
-    mission_payload = response.get("payload", {}).get("mission", {})
-    assert mission_payload.get("mission_id") == mission_id
-    wpl = mission_payload.get("wpl", "")
-    assert isinstance(wpl, str)
-    assert wpl.startswith("QGC WPL 110")
-
-
 def test_task_assign_updates_store_and_publishes_upload(system_bus):
     """Orchestrator task_assign запускает mission upload и обновляет mission_store."""
-    mission_id = f"it-assign-{uuid4().hex[:8]}"
     drone_id = "dr-it-1"
     correlation_id = f"corr-assign-{uuid4().hex[:8]}"
 
-    planned = _create_mission_via_path_planner(system_bus, mission_id)
+    planned = _submit_task_via_gateway(system_bus, _build_task_payload())
     if planned is None:
-        pytest.skip("No response from path_planner. Ensure GCS docker stack is up.")
+        pytest.skip("No response from gateway. Ensure GCS docker stack is up.")
+    mission_id = planned.get("payload", {}).get("mission_id")
+    assert mission_id
 
     def _publish_assign():
         system_bus.publish(
-            OrchestratorTopics.ORCHESTRATOR,
-            {
-                "action": OrchestratorActions.TASK_ASSIGN,
-                "sender": "gcs_integration_test",
-                "correlation_id": correlation_id,
-                "payload": {
+            SystemTopics.GCS,
+            _gateway_publish_message(
+                OrchestratorActions.TASK_ASSIGN,
+                {
                     "mission_id": mission_id,
                     "drone_id": drone_id,
                 },
-            },
+                correlation_id=correlation_id,
+            ),
         )
     messages = _capture_messages_during(
         system_bus,
@@ -323,27 +304,27 @@ def test_task_assign_updates_store_and_publishes_upload(system_bus):
 
 def test_task_start_updates_store_and_publishes_start(system_bus):
     """Orchestrator task_start публикует команду старта в DroneManager внутри GCS."""
-    mission_id = f"it-start-{uuid4().hex[:8]}"
     drone_id = "dr-it-2"
     corr_assign = f"corr-pre-start-{uuid4().hex[:8]}"
     corr_start = f"corr-start-{uuid4().hex[:8]}"
 
-    planned = _create_mission_via_path_planner(system_bus, mission_id)
+    planned = _submit_task_via_gateway(system_bus, _build_task_payload())
     if planned is None:
-        pytest.skip("No response from path_planner. Ensure GCS docker stack is up.")
+        pytest.skip("No response from gateway. Ensure GCS docker stack is up.")
+    mission_id = planned.get("payload", {}).get("mission_id")
+    assert mission_id
 
     def _publish_assign():
         system_bus.publish(
-            OrchestratorTopics.ORCHESTRATOR,
-            {
-                "action": OrchestratorActions.TASK_ASSIGN,
-                "sender": "gcs_integration_test",
-                "correlation_id": corr_assign,
-                "payload": {
+            SystemTopics.GCS,
+            _gateway_publish_message(
+                OrchestratorActions.TASK_ASSIGN,
+                {
                     "mission_id": mission_id,
                     "drone_id": drone_id,
                 },
-            },
+                correlation_id=corr_assign,
+            ),
         )
 
     assign_messages = _capture_messages_during(
@@ -370,16 +351,15 @@ def test_task_start_updates_store_and_publishes_start(system_bus):
 
     def _publish_start():
         system_bus.publish(
-            OrchestratorTopics.ORCHESTRATOR,
-            {
-                "action": OrchestratorActions.TASK_START,
-                "sender": "gcs_integration_test",
-                "correlation_id": corr_start,
-                "payload": {
+            SystemTopics.GCS,
+            _gateway_publish_message(
+                OrchestratorActions.TASK_START,
+                {
                     "mission_id": mission_id,
                     "drone_id": drone_id,
                 },
-            },
+                correlation_id=corr_start,
+            ),
         )
 
     start_messages = _capture_messages_during(

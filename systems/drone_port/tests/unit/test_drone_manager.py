@@ -6,6 +6,8 @@ from systems.drone_port.src.drone_manager.src.drone_manager import DroneManager
 from systems.drone_port.src.charging_manager.topics import ComponentTopics as ChargingTopics, ChargingManagerActions
 from systems.drone_port.src.drone_manager.topics import DroneManagerActions
 from systems.drone_port.src.drone_registry.topics import ComponentTopics as RegistryTopics, DroneRegistryActions
+from systems.drone_port.src.gateway.topics import ExternalTopics as GatewayExternalTopics
+from systems.drone_port.src.gateway.topics import GatewayActions, SystemTopics
 from systems.drone_port.src.port_manager.topics import ComponentTopics as PortTopics, PortManagerActions
 
 
@@ -89,12 +91,22 @@ def test_takeoff_publishes_port_release_and_sitl_home(mock_bus, patch_drone_mana
         },
     )
     assert mock_bus.publish.call_args_list[1].args == (
-        "sitl",
+        SystemTopics.DRONE_PORT,
         {
-            "drone_id": "DR-1",
-            "home_lat": 55.751,
-            "home_lon": 37.617,
-            "home_alt": 0.0,
+            "action": GatewayActions.PROXY_PUBLISH,
+            "sender": GatewayExternalTopics.DRONE_PORT,
+            "payload": {
+                "target": {
+                    "topic": GatewayExternalTopics.SITL,
+                    "action": GatewayActions.SITL_HOME_PUBLISH,
+                },
+                "data": {
+                    "drone_id": "DR-1",
+                    "home_lat": 55.751,
+                    "home_lon": 37.617,
+                    "home_alt": 0.0,
+                },
+            },
         },
     )
     assert len(mock_bus.publish.call_args_list) == 2

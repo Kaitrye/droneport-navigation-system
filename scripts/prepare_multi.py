@@ -292,6 +292,9 @@ def prepare_multi(systems: List[str], output: Optional[str]) -> None:
 
             env_dict = env_list_to_dict(svc.get("environment"))
             if original_name != "redis":
+                env_dict["SYSTEM_NAMESPACE"] = sys_name.lower()
+
+            if original_name != "redis":
                 if "REDIS_HOST" in env_dict and has_global_redis:
                     env_dict["REDIS_HOST"] = "redis"
 

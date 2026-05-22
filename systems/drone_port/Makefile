@@ -34,7 +34,6 @@ docker-up-no-broker: prepare
 		redis state_store port_manager drone_registry charging_manager drone_manager orchestrator gateway
 
 docker-down:
-	-$(DOCKER_COMPOSE) --profile kafka down 2>/dev/null
 	-$(DOCKER_COMPOSE) --profile mqtt down 2>/dev/null
 
 docker-down-no-broker:
@@ -46,7 +45,6 @@ docker-logs:
 		$(DOCKER_COMPOSE) --profile $${BROKER_TYPE:-mqtt} logs -f
 
 docker-clean:
-	-$(DOCKER_COMPOSE) --profile kafka down -v --rmi local 2>/dev/null
 	-$(DOCKER_COMPOSE) --profile mqtt down -v --rmi local 2>/dev/null
 
 unit-test:

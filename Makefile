@@ -61,12 +61,12 @@ up-all:
 	@PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run python scripts/prepare_multi.py \
 		--systems $(SYSTEMS) --output $(MULTI_OUTPUT)
 	@set -a && . $(MULTI_OUTPUT)/.env && set +a && \
-		$(MULTI_COMPOSE) --profile $${BROKER_TYPE:-kafka} up -d --build
+		$(MULTI_COMPOSE) --profile $${BROKER_TYPE:-mqtt} up -d --build --remove-orphans
 
 up-broker:
 	@test -f docker/.env || cp docker/example.env docker/.env
 	@set -a && . docker/.env && set +a && \
-		profiles="--profile $${BROKER_TYPE:-kafka}"; \
+		profiles="--profile $${BROKER_TYPE:-mqtt}"; \
 		[ "$${ENABLE_FABRIC:-false}" = "true" ] && profiles="$$profiles --profile fabric"; \
 		$(BROKER_COMPOSE) $$profiles up -d --build
 
@@ -80,13 +80,12 @@ down: down-all
 
 down-all:
 	@if [ -f "$(MULTI_OUTPUT)/docker-compose.yml" ]; then \
-		$(MULTI_COMPOSE) --profile kafka --profile mqtt --profile fabric down; \
+		$(MULTI_COMPOSE) --profile mqtt --profile fabric down; \
 	else \
 		echo "$(MULTI_OUTPUT)/docker-compose.yml not found. Run: make up"; \
 	fi
 
 down-broker:
-	-$(BROKER_COMPOSE) --profile kafka --profile fabric down 2>/dev/null
 	-$(BROKER_COMPOSE) --profile mqtt --profile fabric down 2>/dev/null
 
 down-gcs:
@@ -99,25 +98,24 @@ stop: stop-all
 
 stop-all:
 	@if [ -f "$(MULTI_OUTPUT)/docker-compose.yml" ]; then \
-		$(MULTI_COMPOSE) --profile kafka --profile mqtt --profile fabric stop; \
+		$(MULTI_COMPOSE) --profile mqtt --profile fabric stop; \
 	else \
 		echo "$(MULTI_OUTPUT)/docker-compose.yml not found. Run: make up"; \
 	fi
 
 stop-broker:
-	-$(BROKER_COMPOSE) --profile kafka --profile fabric stop 2>/dev/null
 	-$(BROKER_COMPOSE) --profile mqtt --profile fabric stop 2>/dev/null
 
 stop-gcs:
 	@if [ -f "systems/gcs/.generated/docker-compose.yml" ]; then \
-		$(GCS_COMPOSE) --profile kafka --profile mqtt stop; \
+		$(GCS_COMPOSE) --profile mqtt stop; \
 	else \
 		echo "systems/gcs/.generated/docker-compose.yml not found. Run: make up-gcs"; \
 	fi
 
 stop-drone-port:
 	@if [ -f "systems/drone_port/.generated/docker-compose.yml" ]; then \
-		$(DRONE_PORT_COMPOSE) --profile kafka --profile mqtt stop; \
+		$(DRONE_PORT_COMPOSE) --profile mqtt stop; \
 	else \
 		echo "systems/drone_port/.generated/docker-compose.yml not found. Run: make up-drone-port"; \
 	fi
@@ -126,24 +124,24 @@ ps: ps-all
 
 ps-all:
 	@if [ -f "$(MULTI_OUTPUT)/docker-compose.yml" ]; then \
-		$(MULTI_COMPOSE) --profile kafka --profile mqtt --profile fabric ps; \
+		$(MULTI_COMPOSE) --profile mqtt --profile fabric ps; \
 	else \
 		echo "$(MULTI_OUTPUT)/docker-compose.yml not found. Run: make up"; \
 	fi
 
 ps-broker:
-	@$(BROKER_COMPOSE) --profile kafka --profile mqtt --profile fabric ps
+	@$(BROKER_COMPOSE) --profile mqtt --profile fabric ps
 
 ps-gcs:
 	@if [ -f "systems/gcs/.generated/docker-compose.yml" ]; then \
-		$(GCS_COMPOSE) --profile kafka --profile mqtt ps; \
+		$(GCS_COMPOSE) --profile mqtt ps; \
 	else \
 		echo "systems/gcs/.generated/docker-compose.yml not found. Run: make up-gcs"; \
 	fi
 
 ps-drone-port:
 	@if [ -f "systems/drone_port/.generated/docker-compose.yml" ]; then \
-		$(DRONE_PORT_COMPOSE) --profile kafka --profile mqtt ps; \
+		$(DRONE_PORT_COMPOSE) --profile mqtt ps; \
 	else \
 		echo "systems/drone_port/.generated/docker-compose.yml not found. Run: make up-drone-port"; \
 	fi
@@ -152,14 +150,14 @@ log: log-all
 logs: log
 log-all:
 	@if [ -f "$(MULTI_OUTPUT)/docker-compose.yml" ]; then \
-		$(MULTI_COMPOSE) --profile kafka --profile mqtt --profile fabric logs -f; \
+		$(MULTI_COMPOSE) --profile mqtt --profile fabric logs -f; \
 	else \
 		echo "$(MULTI_OUTPUT)/docker-compose.yml not found. Run: make up"; \
 	fi
 logs-all: log-all
 
 log-broker:
-	@$(BROKER_COMPOSE) --profile kafka --profile mqtt --profile fabric logs -f
+	@$(BROKER_COMPOSE) --profile mqtt --profile fabric logs -f
 logs-broker: log-broker
 
 log-gcs:
@@ -191,7 +189,6 @@ integration-test-no-up: integration-test-broker-no-up integration-test-drone-por
 integration-test-broker: up-broker
 	@status=0; \
 	$(MAKE) integration-test-broker-no-up || status=$$?; \
-	$(BROKER_COMPOSE) --profile kafka --profile fabric down >/dev/null 2>&1 || true; \
 	$(BROKER_COMPOSE) --profile mqtt --profile fabric down >/dev/null 2>&1 || true; \
 	exit $$status
 

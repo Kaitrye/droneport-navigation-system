@@ -13,6 +13,12 @@ class SystemTopics:
     GCS = f"{_P}systems.gcs"
 
 
+class ExternalTopics:
+    OPERATOR = f"{_P}systems.operator"
+    GCS = SystemTopics.GCS
+    AGRODRON = f"{_P}systems.agrodron"
+
+
 class ComponentTopics:
     DRONE_MANAGER = f"{_P}components.drone_manager"
     DRONE_STORE = f"{_P}components.drone_store"
@@ -37,3 +43,6 @@ class GatewayActions:
     TASK_SUBMIT = OrchestratorActions.TASK_SUBMIT
     TASK_ASSIGN = OrchestratorActions.TASK_ASSIGN
     TASK_START = OrchestratorActions.TASK_START
+    PROXY_REQUEST = "proxy_request"
+    PROXY_PUBLISH = "proxy_publish"
+    LIST_POLICIES = "list_policies"

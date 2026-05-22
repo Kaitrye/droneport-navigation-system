@@ -7,7 +7,8 @@ from typing import Dict, Any
 from sdk.base_component import BaseComponent
 from broker.src.system_bus import SystemBus
 
-from ....topics import ExternalTopics
+from ...gateway.topics import ExternalTopics as GatewayExternalTopics
+from ...gateway.topics import GatewayActions, SystemTopics
 from ...charging_manager.topics import ComponentTopics as ChargingTopics, ChargingManagerActions
 from ...drone_registry.topics import ComponentTopics as RegistryTopics, DroneRegistryActions
 from ...port_manager.topics import ComponentTopics as PortTopics, PortManagerActions
@@ -253,7 +254,20 @@ class DroneManager(BaseComponent):
                     }
                 )
 
-                self.bus.publish(ExternalTopics.SITL_HOME, _build_sitl_home_message(drone_id, drone_port))
+                self.bus.publish(
+                    SystemTopics.DRONE_PORT,
+                    {
+                        "action": GatewayActions.PROXY_PUBLISH,
+                        "sender": GatewayExternalTopics.DRONE_PORT,
+                        "payload": {
+                            "target": {
+                                "topic": GatewayExternalTopics.SITL,
+                                "action": GatewayActions.SITL_HOME_PUBLISH,
+                            },
+                            "data": _build_sitl_home_message(drone_id, drone_port),
+                        },
+                    },
+                )
 
                 return {
                     "approved": True,
