@@ -3,7 +3,13 @@ import types
 from unittest.mock import MagicMock
 
 import pytest
-import redis
+
+try:
+    import redis
+except ModuleNotFoundError:
+    redis = types.ModuleType("redis")
+    redis.Redis = type("Redis", (), {})
+    sys.modules.setdefault("redis", redis)
 
 flask_stub = types.ModuleType("flask")
 flask_stub.Flask = type("Flask", (), {})

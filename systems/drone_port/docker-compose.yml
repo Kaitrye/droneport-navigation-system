@@ -10,6 +10,33 @@ services:
       - drones_net
     restart: unless-stopped
 
+  security_monitor:
+    build:
+      context: ../..
+      dockerfile: systems/drone_port/src/security_monitor/docker/Dockerfile
+    profiles: ["kafka", "mqtt"]
+    environment:
+      - COMPONENT_ID=drone_port_security_monitor
+      - COMPONENT_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
+      - INSTANCE_ID=${INSTANCE_ID:-1}
+      - SYSTEM_NAME=${SYSTEM_NAME:-drone_port}
+      - BROKER_TYPE=${BROKER_TYPE:-mqtt}
+      - BROKER_USER=${ADMIN_USER:-admin}
+      - BROKER_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SECURITY_JOURNAL_FILE_PATH=${DRONE_PORT_SECURITY_JOURNAL_FILE_PATH:-/var/log/drones/drone_port_security_journal.ndjson}
+      - SECURITY_JOURNAL_SERVICE_ID=${DRONE_PORT_SECURITY_JOURNAL_SERVICE_ID:-2}
+      - INFOPANEL_URL=${INFOPANEL_URL:-}
+      - INFOPANEL_API_KEY=${INFOPANEL_API_KEY:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ${DRONE_PORT_SECURITY_JOURNAL_DIR:-./.generated/logs}:/var/log/drones
+    networks:
+      - drones_net
+    restart: unless-stopped
+
   state_store:
     build:
       context: ../..
@@ -25,6 +52,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONUNBUFFERED=1
@@ -47,6 +75,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - PYTHONUNBUFFERED=1
     networks:
       - drones_net
@@ -67,6 +96,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - PYTHONUNBUFFERED=1
     networks:
       - drones_net
@@ -87,6 +117,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONUNBUFFERED=1
@@ -109,6 +140,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONUNBUFFERED=1
@@ -131,6 +163,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONUNBUFFERED=1
@@ -153,6 +186,7 @@ services:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JOURNAL_TOPIC=${DRONE_PORT_SECURITY_MONITOR_TOPIC:-components.drone_port_security_monitor}
       - PYTHONUNBUFFERED=1
     networks:
       - drones_net
